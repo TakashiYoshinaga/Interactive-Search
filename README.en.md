@@ -4,9 +4,10 @@ English | [日本語](README.md)
 
 A learning tool that lets you stack up a graph pattern with buttons and watch the generated Cypher and its results at the same time. It is meant for session 3 (the graph database session) of [nordwind-workshop](https://github.com/noctetemp/nordwind-workshop).
 
-**[Open the live demo](https://takashiyoshinaga.github.io/Interactive-Search/)**
+- **Graph Ladder demo**  
+  [![Graph Ladder demo](https://img.youtube.com/vi/pRG5rMNnSj8/maxresdefault.jpg)](https://www.youtube.com/watch?v=pRG5rMNnSj8)
 
-Your browser talks to your own Neo4j AuraDB directly. There is no server in between.
+**[Open the live demo](https://takashiyoshinaga.github.io/Interactive-Search/)**
 
 ## What it does
 
