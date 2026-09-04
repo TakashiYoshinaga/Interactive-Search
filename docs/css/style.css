@@ -743,11 +743,11 @@ code {
 /* ── 候補 ───────────────────────────────────────────────── */
 .cand {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   width: 100%;
   min-height: 32px;
-  padding: 5px 8px;
+  padding: 6px 8px;
   border: 0;
   background: transparent;
   border-radius: var(--radius);
@@ -757,22 +757,28 @@ code {
 .cand + .cand { margin-top: 1px; }
 .cand:hover:not(:disabled) { background: var(--panel-2); }
 
+/* 幅が足りないときは「-[:X]-> の後ろ」で折る。省略記号で
+   (:Label) を落とすと、何に伸びる候補なのか読めなくなる */
 .cand__pat {
   display: flex;
-  align-items: center;
-  gap: 7px;
+  flex-wrap: wrap;
+  align-items: baseline;
   font-family: var(--mono);
   font-size: 12.5px;
+  line-height: 1.5;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1 1 auto;
 }
+.cand__pat .dot { align-self: flex-start; margin: 5px 7px 0 0; }
+.cand__rel, .cand__lab { white-space: nowrap; }
+.cand__txt { overflow-wrap: anywhere; }
 
 .cand__num {
-  margin-left: auto;
+  flex: none;
   padding-left: 8px;
+  margin-left: auto;
   font-size: 11px;
+  line-height: 1.6;
   color: var(--fg-faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

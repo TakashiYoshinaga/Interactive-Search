@@ -171,7 +171,9 @@ function notifyError(err) {
     document.getElementById('app').hidden = true;
     return;
   }
-  showToast($('toast'), t(`error.${err.kind}.short`) || err.detail, 'warn');
+  const key = `fatal.${err.kind || 'unknown'}.title`;
+  const translated = t(key);
+  showToast($('toast'), translated === key ? (err.detail || t('fatal.unknown.title')) : translated, 'warn');
 }
 
 const handlers = {

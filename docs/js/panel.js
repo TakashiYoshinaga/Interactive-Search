@@ -56,6 +56,20 @@ function edgePattern(rel) {
   return `-[:${rel}]->`;
 }
 
+function errorText(error) {
+  if (!error) return '';
+  if (typeof error === 'string') return error;
+  const key = `fatal.${error.kind || 'unknown'}.title`;
+  const translated = t(key);
+  return translated === key ? String(error.detail || t('fatal.unknown.title')) : translated;
+}
+
+function errorSig(error) {
+  return error && typeof error === 'object'
+    ? JSON.stringify({ kind: error.kind, code: error.code, detail: error.detail })
+    : String(error || '');
+}
+
 /** 再描画で焦点が飛ぶとキーボード操作が続けられない。
  *  data-fk（focus key）で同じ行を探し直して戻す。 */
 function keepFocus(container, paint) {
@@ -168,7 +182,7 @@ export function createPanel(refs, handlers = {}) {
         btn.setAttribute('data-fk', `start:${label}`);
         const head = el('span', 'cand__pat');
         head.append(dot(theme, label),
-                    el('span', null, t('cand.start', { pattern: rungPattern(label) })));
+                    el('span', 'cand__txt', t('cand.start', { pattern: rungPattern(label) })));
         btn.append(head, el('span', 'cand__num', String(labelTotals[label] ?? '')));
         btn.addEventListener('click', () => call('onStart', label));
         candRows.append(btn);
@@ -179,7 +193,7 @@ export function createPanel(refs, handlers = {}) {
 
     if (cands.error) {
       const box = el('p', 'hint hint--err');
-      box.append(el('span', null, t('cand.error')), el('span', 'hint__raw', String(cands.error)));
+      box.append(el('span', null, t('cand.error')), el('span', 'hint__raw', errorText(cands.error)));
       candRows.append(box);
     }
 
@@ -195,9 +209,12 @@ export function createPanel(refs, handlers = {}) {
       btn.disabled = dead || full;
       btn.classList.toggle('is-dead', dead);
 
+      // 辺と段を別の span にしておくと、幅が足りないときに
+      // 「-[:X]-> の後ろ」で折れる。パターンの途中では折らせない
       const pat = el('span', 'cand__pat');
       pat.append(dot(theme, cand.label),
-                 el('span', null, `${edgePattern(cand.rel)}${rungPattern(cand.label)}`));
+                 el('span', 'cand__rel', edgePattern(cand.rel)),
+                 el('span', 'cand__lab', rungPattern(cand.label)));
       const num = el('span', 'cand__num',
         dead ? t('cand.dead') : t('cand.stats', { nodes: cand.nodes, edges: cand.edges }));
       btn.append(pat, num);
@@ -225,7 +242,7 @@ export function createPanel(refs, handlers = {}) {
 
     if (result.error) {
       const box = el('p', 'hint hint--err');
-      box.append(el('span', null, t('results.error')), el('span', 'hint__raw', String(result.error)));
+      box.append(el('span', null, t('results.error')), el('span', 'hint__raw', errorText(result.error)));
       resultRows.append(box);
     }
 
@@ -330,14 +347,14 @@ export function createPanel(refs, handlers = {}) {
     const next = {
       ladder: JSON.stringify([s.ladder, s.rungs.map((r) => r.count), s.labelTotals]),
       cand: JSON.stringify([s.ladder.length, s.labels, s.labelTotals,
-                            s.cands.rows, s.cands.error ? String(s.cands.error) : null,
+                            s.cands.rows, errorSig(s.cands.error),
                             !!s.cands.running]),
       result: JSON.stringify([s.ladder.map((x) => x.label ?? null),
-                              s.rungs, s.result.error ? String(s.result.error) : null,
+                              s.rungs, errorSig(s.result.error),
                               !!s.result.running]),
       cypher: JSON.stringify([s.result.cypher ?? null, s.result.paths ?? null,
                               s.result.ms ?? null, !!s.result.running,
-                              s.result.error ? String(s.result.error) : null]),
+                              errorSig(s.result.error)]),
       status: JSON.stringify([s.labels, s.labelTotals]),
     };
 

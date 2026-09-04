@@ -198,7 +198,13 @@ export function createScreens(root, handlers = {}) {
   function paintLogin(data = {}) {
     const msg = data && data.error;
     loginErr.hidden = !msg;
-    loginErr.textContent = msg ? String(msg) : '';
+    if (!msg) loginErr.textContent = '';
+    else if (typeof msg === 'string') loginErr.textContent = msg;
+    else {
+      const key = `fatal.${msg.kind || 'unknown'}.title`;
+      const translated = t(key);
+      loginErr.textContent = translated === key ? String(msg.detail || t('fatal.unknown.title')) : translated;
+    }
     paintDerived();
   }
 

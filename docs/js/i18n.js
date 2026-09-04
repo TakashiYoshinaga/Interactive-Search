@@ -160,7 +160,7 @@ const DICT = {
       'このツールはグラフ全体を一度に描きます。ワークショップの 73 ノード / 153 リレーションの規模のために作られていて、それより大きなデータベースは想定していません。\nワークショップ用のインスタンスにつなぎ直してください。',
     'fatal.fileprotocol.title': 'http で開き直してください',
     'fatal.fileprotocol.body':
-      'このページが `file://` で開かれています。ES モジュールは `file://` では読み込めないので、何も動きません。\nリポジトリのルートで `npx serve docs` を実行して、表示された http のアドレスを開いてください。\nPython が入っていれば `python -m http.server` でも構いません（この場合は `http://localhost:8000/docs/`）。',
+      'このページが `file://` で開かれています。ES モジュールは `file://` では読み込めないので、何も動きません。\nリポジトリのルートで `node tools/serve.mjs` を実行して、`http://127.0.0.1:8000/docs/` を開いてください。\nPython が入っていれば `python -m http.server` でも構いません（この場合は `http://localhost:8000/docs/`）。',
     'fatal.unknown.title': '予期しないエラーです',
     'fatal.unknown.body':
       '想定していない失敗です。下の詳細に元のメッセージが出ています。\nもう一度試しても直らない場合は、接続情報とネットワークを見直してください。',
@@ -197,6 +197,9 @@ const DICT = {
     'cypher.error': 'エラー',
     'toast.copied': 'Cypher をコピーしました',
     'toast.copyFailed': 'コピーできませんでした',
+    'toast.tooLong': 'ラダーは最大 {max} 段です',
+    'toast.pinNoKey': 'このノードには固定に使える name / id がありません',
+    'toast.pinLabel': '末尾は :{label} です。:{got} のノードには固定できません',
   },
 
   en: {
@@ -324,7 +327,7 @@ const DICT = {
       'The tool draws the whole graph at once. It is built for the workshop\u2019s ~73-node, ~153-relationship dataset and does not expect anything much bigger.\nConnect to the workshop instance instead.',
     'fatal.fileprotocol.title': 'Open this over http instead',
     'fatal.fileprotocol.body':
-      'This page was opened as `file://`. ES modules cannot load from `file://`, so nothing will run.\nFrom the repository root, run `npx serve docs` and open the http address it prints.\nIf you have Python, `python -m http.server` works too — then open `http://localhost:8000/docs/`.',
+      'This page was opened as `file://`. ES modules cannot load from `file://`, so nothing will run.\nFrom the repository root, run `node tools/serve.mjs`, then open `http://127.0.0.1:8000/docs/`.\nIf you have Python, `python -m http.server` works too — then open `http://localhost:8000/docs/`.',
     'fatal.unknown.title': 'Something unexpected happened',
     'fatal.unknown.body':
       'This is a failure the tool does not recognise. The original message is in the details below.\nIf trying again does not help, check the connection details and the network.',
@@ -357,6 +360,9 @@ const DICT = {
     'cypher.error': 'error',
     'toast.copied': 'Cypher copied',
     'toast.copyFailed': 'Could not copy',
+    'toast.tooLong': 'The ladder is limited to {max} rungs',
+    'toast.pinNoKey': 'This node has no name or id that can be used for a pin',
+    'toast.pinLabel': 'The tail is :{label}; a :{got} node cannot be pinned here',
   },
 };
 

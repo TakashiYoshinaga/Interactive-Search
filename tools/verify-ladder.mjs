@@ -261,6 +261,9 @@ async function main() {
     check('litEdges (elementId)', r1.litEdges.size, 24);
     check('litEdges (from|TYPE|to)', r1.litEdgeTriples.size, 24);
     check('paths', r1.paths, 17);
+    const keyByEid = new Map(graphNodes.map((n) => [n.eid, n.key]));
+    check('結果名と elementId の対応', r1.rungs.every((rung) =>
+      rung.names.every((name, i) => keyByEid.get(rung.eids[i]) === name)), true);
     note('答えのエンジニア', r1.rungs[0].names.join(', '));
 
     console.log('\n── 可変長 (DEPENDS_ON x1..3) ──');
@@ -280,12 +283,13 @@ async function main() {
     check('MEMBER_OF', [byRel.MEMBER_OF?.nodes, byRel.MEMBER_OF?.edges], [8, 30]);
 
     console.log('\n── 0 件の候補が行として残るか（先読みの肝） ──');
-    const teamCands = await lookaheadSingle(run, [
-      { label: 'Team' }, { rel: 'OWNS', hops: [1, 1] },
-      { label: 'Service', pin: { prop: 'name', value: 'payment-gateway' } },
+    const deadCands = await lookaheadSingle(run, [
+      { label: 'Service', pin: { prop: 'name', value: 'auth-service' } },
     ], schema);
-    note('(:Team)-[:OWNS]->(:Service{payment-gateway}) の次',
-      teamCands.map((c) => `${c.rel}->${c.label} ${c.nodes}n/${c.edges}e`).join(', ') || '(なし)');
+    check('0 件でも候補行を残す', deadCands.length, 1);
+    check('auth-service の次は行き止まり',
+      [deadCands[0]?.rel, deadCands[0]?.label, deadCands[0]?.nodes, deadCands[0]?.edges],
+      ['DEPENDS_ON', 'Service', 0, 0]);
 
     console.log('\n── 単一クエリ版の先読み == N 本版 ──');
     const ladders = randomLadders(schema, graphNodes, 20);

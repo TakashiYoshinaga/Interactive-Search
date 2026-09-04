@@ -202,11 +202,21 @@ export function parseEvaluate(records, nRungs) {
     }
   }
 
-  const rungs = rungMaps.map((m) => ({
-    count: m.size,
-    names: [...m.values()].filter((v) => v !== null).sort(byteCompare),
-    eids: [...m.keys()].sort(byteCompare),
-  }));
+  const rungs = rungMaps.map((m) => {
+    // name と eid は結果一覧で同じ添字として使う。別々にソートすると、行を
+    // クリックしたときに別ノードへフォーカスしてしまうので組のまま並べる
+    const rows = [...m].map(([eid, name]) => ({ eid, name }));
+    rows.sort((a, b) => {
+      const aName = a.name === null || a.name === undefined ? '\uffff' : String(a.name);
+      const bName = b.name === null || b.name === undefined ? '\uffff' : String(b.name);
+      return byteCompare(aName, bName) || byteCompare(a.eid, b.eid);
+    });
+    return {
+      count: m.size,
+      names: rows.map((row) => row.name),
+      eids: rows.map((row) => row.eid),
+    };
+  });
 
   return { rungs, litNodes, litEdges, litEdgeTriples, paths: records.length };
 }

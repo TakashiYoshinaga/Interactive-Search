@@ -19,12 +19,15 @@ import { CSS2DRenderer, CSS2DObject } from '../vendor/CSS2DRenderer.js';
 import { parseHex, mix, toHex } from './theme.js';
 
 const FOV = 45;
-const FIT_MARGIN = 1.45;
+const FIT_MARGIN = 1.08;
 const NODE_SCALE = 0.016;      // 正規化空間（半径ほぼ1）での大きさに落とす係数
 const EDGE_MIN = 0.10;         // 減衰した辺をどこまで背景に寄せるか
 const EDGE_IDLE = 0.42;
 const CAM_TWEEN_SEC = 0.5;
+const FOCUS_DISTANCE = 1.55;
 const PICK_PX = 14;            // 画面上の当たり判定の半径。見た目が縮んでも変えない
+const LABEL_H = 15;
+const LABEL_GAP = 3;
 
 export function createView(container, { theme }) {
   let currentTheme = theme;
@@ -46,8 +49,8 @@ export function createView(container, { theme }) {
   controls.enableDamping = true;
   controls.dampingFactor = 0.12;
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x666666, 1.15));
-  const key = new THREE.DirectionalLight(0xffffff, 0.8);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x666666, 0.9));
+  const key = new THREE.DirectionalLight(0xffffff, 0.55);
   key.position.set(1.2, 1.6, 1.4);
   scene.add(key);
 
@@ -68,6 +71,7 @@ export function createView(container, { theme }) {
   let hoverIdx = -1;
   let dragMoved = 0;
   let pointerDown = null;
+  let controlsMoving = false;
 
   const geomCache = new Map();
   function geometryFor(shape) {
@@ -116,11 +120,54 @@ export function createView(container, { theme }) {
       const base = mix(bgRGB, styles[i].rgb, strength);
       const tinted = accent > 0.02 ? mix(base, hotRGB, accent * 0.45) : base;
       m.material.color.set(toHex(tinted));
-      m.material.emissive.set(toHex(mix(bgRGB, tinted, 0.12 + 0.23 * cur.nodeHot[i] + 0.2 * accent)));
+      // 背景色を emissive に入れると照明との和で白飛びする。自発光は色そのものを
+      // 弱く足し、マットな面の色を保つ
+      const glow = 0.025 + 0.075 * cur.nodeHot[i] + 0.08 * accent;
+      m.material.emissive.setRGB(
+        tinted[0] / 255 * glow,
+        tinted[1] / 255 * glow,
+        tinted[2] / 255 * glow,
+      );
+    }
+  }
 
-      const focus = Math.max(cur.nodeHot[i], cur.nodeHover[i], cur.nodePin[i]);
-      const el = labels[i];
-      if (el) el.element.style.opacity = focus > 0.25 ? String(Math.min(1, focus)) : '0';
+  /** 強調中のラベルを画面空間で間引く。ピンとホバーは常に残す。 */
+  function updateLabels(cur) {
+    if (!graph) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const candidates = [];
+    for (let i = 0; i < graph.nodes.length; i++) {
+      const accent = Math.max(cur.nodeHover[i], cur.nodePin[i]);
+      const focus = Math.max(cur.nodeHot[i], accent);
+      if (focus <= 0.25) {
+        labels[i].element.style.opacity = '0';
+        continue;
+      }
+      projected.set(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]).project(camera);
+      if (projected.z < -1 || projected.z > 1) {
+        labels[i].element.style.opacity = '0';
+        continue;
+      }
+      const x = (projected.x * 0.5 + 0.5) * rect.width;
+      const y = (-projected.y * 0.5 + 0.5) * rect.height;
+      const w = Math.min(rect.width * 0.32, Math.max(32, graph.nodes[i].name.length * 6.2));
+      candidates.push({ i, x, y, w, focus, accent, priority: accent * 10 + cur.nodeHot[i] });
+    }
+    candidates.sort((a, b) => b.priority - a.priority || a.i - b.i);
+    const placed = [];
+    for (const item of candidates) {
+      const box = {
+        x0: item.x - item.w / 2 + 8 - LABEL_GAP,
+        x1: item.x + item.w / 2 + 8 + LABEL_GAP,
+        y0: item.y - LABEL_H / 2 - LABEL_GAP,
+        y1: item.y + LABEL_H / 2 + LABEL_GAP,
+      };
+      const collision = placed.some((other) =>
+        box.x0 < other.x1 && box.x1 > other.x0 && box.y0 < other.y1 && box.y1 > other.y0
+      );
+      const visible = item.accent > 0.25 || !collision;
+      labels[item.i].element.style.opacity = visible ? String(Math.min(1, item.focus)) : '0';
+      if (visible) placed.push(box);
     }
   }
 
@@ -286,7 +333,7 @@ export function createView(container, { theme }) {
       const fit = fitCamera();
       camera.position.copy(fit.position);
       controls.target.copy(fit.target);
-      controls.update();
+      controlsMoving = controls.update();
     },
 
     setTheme(next) {
@@ -309,10 +356,11 @@ export function createView(container, { theme }) {
         controls.target.lerpVectors(camTween.from.target, camTween.to.target, e);
         if (camTween.t >= 1) camTween = null;
       }
-      controls.update();
+      controlsMoving = controls.update();
       updateNodes(cur);
       updateEdges(cur);
       renderer.render(scene, camera);
+      updateLabels(cur);
       labelRenderer.render(scene, camera);
     },
 
@@ -331,12 +379,12 @@ export function createView(container, { theme }) {
       const dir = camera.position.clone().sub(controls.target).normalize();
       camTween = {
         from: { position: camera.position.clone(), target: controls.target.clone() },
-        to: { position: p.clone().add(dir.multiplyScalar(radius * 0.9)), target: p },
+        to: { position: p.clone().add(dir.multiplyScalar(radius * FOCUS_DISTANCE)), target: p },
         t: 0,
       };
     },
 
-    isCameraMoving: () => camTween !== null || controls.enableDamping,
+    isCameraMoving: () => camTween !== null || controlsMoving,
 
     getCameraState: () => ({
       position: camera.position.toArray(),
@@ -350,11 +398,12 @@ export function createView(container, { theme }) {
         camera.position.fromArray(s.position);
         controls.target.fromArray(s.target);
       } else if (Number.isFinite(s.cx) && Number.isFinite(s.k)) {
-        const dist = (radius * FIT_MARGIN) / Math.tan((FOV * Math.PI) / 360);
+        const zoom = Number.isFinite(s.zoom) ? Math.max(0.5, Math.min(3, s.zoom)) : 1;
+        const dist = (radius * FIT_MARGIN) / Math.tan((FOV * Math.PI) / 360) / zoom;
         controls.target.set(s.cx, s.cy, 0);
-        camera.position.set(s.cx, s.cy - dist * 0.25, s.cz === undefined ? dist : s.cz);
+        camera.position.set(s.cx, s.cy - dist * 0.25, center.z + dist);
       }
-      controls.update();
+      controlsMoving = controls.update();
     },
 
     hitTest(clientX, clientY) {

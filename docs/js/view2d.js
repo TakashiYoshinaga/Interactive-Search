@@ -441,7 +441,7 @@ export function createView(container, { theme }) {
     },
 
     isCameraMoving: () => camTween !== null,
-    getCameraState: () => ({ ...cam }),
+    getCameraState: () => ({ ...cam, zoom: kFit ? cam.k / kFit : 1 }),
     setCameraState(s) {
       if (!s) return;
       if (Number.isFinite(s.cx)) cam.cx = s.cx;
