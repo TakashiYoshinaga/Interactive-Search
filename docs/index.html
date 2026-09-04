@@ -25,18 +25,11 @@
 <script src="./vendor/neo4j-web.min.js"></script>
 
 <!--
-  three は 3D に切り替えたときだけ動的 import する。
-  importmap は後から差し込めないのでここで宣言だけしておく。
+  three は 3D に切り替えたときだけ view3d.js が動的 import する。
+  importmap は使わない（インラインスクリプトなので CSP script-src 'self' に弾かれる）。
+  同梱した OrbitControls / CSS2DRenderer の import 先も相対パスに書き換えてある。
   three.module.min.js は ./three.core.min.js を import するので両方必要。
 -->
-<script type="importmap">
-{
-  "imports": {
-    "three": "./vendor/three.module.min.js",
-    "three/addons/": "./vendor/"
-  }
-}
-</script>
 
 <script type="module" src="./js/app.js"></script>
 </head>

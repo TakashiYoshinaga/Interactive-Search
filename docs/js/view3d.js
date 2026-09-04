@@ -13,9 +13,9 @@
  * 切り替えはレイアウトのやり直しではなくカメラの移動として読める。
  */
 
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/OrbitControls.js';
-import { CSS2DRenderer, CSS2DObject } from 'three/addons/CSS2DRenderer.js';
+import * as THREE from '../vendor/three.module.min.js';
+import { OrbitControls } from '../vendor/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from '../vendor/CSS2DRenderer.js';
 import { parseHex, mix, toHex } from './theme.js';
 
 const FOV = 45;
