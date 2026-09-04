@@ -25,11 +25,16 @@ const FIT_MARGIN = 1.08;
 // 3D もその見え方に揃える。ここを大きくするとノードが互いに埋まり、辺も構造も見えなくなる。
 // 形ごとのジオメトリ自体が半径 1.2〜1.7 を持っているぶんも見込んでいる。
 const NODE_SCALE = 0.006;
+// 面の色を白へ少し寄せる。MeshStandardMaterial は照明を掛けた結果を出すので、
+// パレットの色をそのまま入れると 2D より暗く沈んで見える。その分を持ち上げる
+const NODE_LIFT = 0.16;
 const CAM_TWEEN_SEC = 0.5;
 const FOCUS_DISTANCE = 1.55;
 const PICK_PX = 14;            // 画面上の当たり判定の半径。見た目が縮んでも変えない
 const LABEL_H = 15;
 const LABEL_GAP = 3;
+
+const WHITE = [255, 255, 255];
 
 export function createView(container, { theme }) {
   let currentTheme = theme;
@@ -51,8 +56,8 @@ export function createView(container, { theme }) {
   controls.enableDamping = true;
   controls.dampingFactor = 0.12;
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x666666, 0.9));
-  const key = new THREE.DirectionalLight(0xffffff, 0.55);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8a8a, 1.15));
+  const key = new THREE.DirectionalLight(0xffffff, 0.62);
   key.position.set(1.2, 1.6, 1.4);
   scene.add(key);
 
@@ -119,7 +124,8 @@ export function createView(container, { theme }) {
 
       // 透明度の代わりに背景へ混ぜる。半透明の描画順の破綻を避けるため
       const strength = Math.max(currentTheme.vars.dimAlpha + (1 - currentTheme.vars.dimAlpha) * lit, accent);
-      const base = mix(bgRGB, styles[i].rgb, strength);
+      const lifted = mix(styles[i].rgb, WHITE, NODE_LIFT);
+      const base = mix(bgRGB, lifted, strength);
       const tinted = accent > 0.02 ? mix(base, hotRGB, accent * 0.45) : base;
       m.material.color.set(toHex(tinted));
       // 背景色を emissive に入れると照明との和で白飛びする。自発光は色そのものを
@@ -175,10 +181,10 @@ export function createView(container, { theme }) {
 
   function updateEdges(cur) {
     if (!edgeLines) return;
-    const edgeRGB = parseHex(currentTheme.vars.edge);
+    const edgeRGB = parseHex(currentTheme.vars.edge3d);
     const hotRGB = parseHex(currentTheme.vars.hot);
-    const idleA = currentTheme.vars.edgeIdleAlpha;
-    const dimA = currentTheme.vars.edgeDimAlpha;
+    const idleA = currentTheme.vars.edge3dIdleAlpha;
+    const dimA = currentTheme.vars.edge3dDimAlpha;
     for (let e = 0; e < graph.edges.length; e++) {
       const lit = cur.edgeLit[e];
       const hot = cur.edgeHot[e];
