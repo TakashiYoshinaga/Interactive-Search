@@ -6,7 +6,7 @@
 [nordwind-workshop](https://github.com/noctetemp/nordwind-workshop) の Session 3（グラフデータベース回）で使うことを想定しています。
 
 - **Graph Ladder デモ (クリックで再生)**  
-  [![Graph Ladder デモ](https://img.youtube.com/vi/pRG5rMNnSj8/maxresdefault.jpg)](https://www.youtube.com/watch?v=pRG5rMNnSj8)
+  [![Graph Ladder デモ](https://img.youtube.com/vi/pRG5rMNnSj8/0.jpg)](https://www.youtube.com/watch?v=pRG5rMNnSj8)
 
 **[体験ページを開く](https://takashiyoshinaga.github.io/Interactive-Search/)**
 
