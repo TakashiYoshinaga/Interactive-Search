@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  依存はすべて vendor/ に同梱してあるので script-src 'self' が張れる。
+  このページは Neo4j の資格情報を受け取るので、第三者のスクリプトを同じ実行
+  コンテキストに置かない。connect-src は Aura の Bolt over WSS だけを許す。
+-->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  connect-src 'self' wss://*.databases.neo4j.io wss://*.neo4j.io;
+  script-src 'self';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data:;
+  base-uri 'none';
+  form-action 'none';
+  object-src 'none'">
+<title>Graph Ladder — Cypher を組み立てて学ぶ</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='4' cy='4' r='2.4' fill='%234a7a9b'/><circle cx='12' cy='7' r='2.4' fill='%23b0605c'/><circle cx='6' cy='12' r='2.4' fill='%235f8a68'/><path d='M4 4 12 7 6 12' stroke='%23b8873c' stroke-width='1.1' fill='none'/></svg>">
+<link rel="stylesheet" href="./css/style.css">
+
+<!-- classic script。グローバル neo4j を作る。importmap と module より前に置くこと -->
+<script src="./vendor/neo4j-web.min.js"></script>
+
+<!--
+  three は 3D に切り替えたときだけ動的 import する。
+  importmap は後から差し込めないのでここで宣言だけしておく。
+  three.module.min.js は ./three.core.min.js を import するので両方必要。
+-->
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.min.js",
+    "three/addons/": "./vendor/"
+  }
+}
+</script>
+
+<script type="module" src="./js/app.js"></script>
+</head>
+<body>
+
+<!-- ============================================================
+     画面（splash / prereq / login / connecting / precheck / fatal）
+     中身は screens.js が出し分ける。data-i18n は i18n.js が差し替える。
+     ============================================================ -->
+<div id="screens" class="screens" hidden>
+
+  <!-- 画面の外に固定。まだ topbar が出ていないので、ここでしか言語を選べない -->
+  <div class="screens__lang seg" role="group" data-i18n-title="common.lang" title="言語">
+    <button type="button" class="seg__btn" data-screen-lang="ja">日本語</button>
+    <button type="button" class="seg__btn" data-screen-lang="en">EN</button>
+  </div>
+
+  <!-- ── splash ───────────────────────────────────────────────────── -->
+  <section class="screen" data-screen="splash" hidden>
+    <div class="card card--narrow">
+      <p class="card__kicker" data-i18n="splash.tagline">Cypher を組み立てて学ぶ</p>
+      <h1 class="card__title" data-i18n="splash.title">Graph Ladder</h1>
+      <p class="card__lead" data-i18n="splash.lead"></p>
+      <div class="prose" data-rich="splash.body"></div>
+      <ul class="links">
+        <li><a class="link" data-link="repo" href="https://github.com/noctetemp/nordwind-workshop"
+               target="_blank" rel="noopener noreferrer" data-i18n="splash.repo"></a></li>
+        <li><a class="link" data-link="notebook"
+               href="https://colab.research.google.com/github/noctetemp/nordwind-workshop/blob/main/session3_graphs_en.ipynb"
+               target="_blank" rel="noopener noreferrer" data-i18n="splash.notebook"></a></li>
+      </ul>
+      <div class="card__actions">
+        <button type="button" class="btn btn--primary" data-act="start" data-i18n="splash.start"></button>
+      </div>
+      <p class="card__note" data-i18n="splash.note"></p>
+    </div>
+  </section>
+
+  <!-- ── prereq ───────────────────────────────────────────────────── -->
+  <section class="screen" data-screen="prereq" hidden>
+    <div class="card">
+      <h1 class="card__title" data-i18n="prereq.title"></h1>
+      <div class="prose" data-rich="prereq.lead"></div>
+
+      <!-- セクション名・セルの内容は notebook の表記そのままなので訳さない -->
+      <table class="tbl tbl--steps">
+        <thead>
+          <tr>
+            <th scope="col" data-i18n="prereq.col.n"></th>
+            <th scope="col" data-i18n="prereq.col.section"></th>
+            <th scope="col" data-i18n="prereq.col.cell"></th>
+            <th scope="col" data-i18n="prereq.col.why"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="num">1</td>
+            <td><code>0 · Setup</code></td>
+            <td data-rich-cell="prereq.s1.cell"></td>
+            <td data-rich-cell="prereq.s1.why"></td>
+          </tr>
+          <tr>
+            <td class="num">2</td>
+            <td><code>0 · Setup</code></td>
+            <td data-rich-cell="prereq.s2.cell"></td>
+            <td data-rich-cell="prereq.s2.why"></td>
+          </tr>
+          <tr>
+            <td class="num">3</td>
+            <td><code>3 · 🔌 Connect to your Neo4j</code></td>
+            <td data-rich-cell="prereq.s3.cell"></td>
+            <td data-rich-cell="prereq.s3.why"></td>
+          </tr>
+          <tr>
+            <td class="num">4</td>
+            <td><code>3 · 🔌 Connect to your Neo4j</code></td>
+            <td data-rich-cell="prereq.s4.cell"></td>
+            <td data-rich-cell="prereq.s4.why"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="prose" data-rich="prereq.note.both"></div>
+      <div class="prose" data-rich="prereq.note.skip"></div>
+      <div class="notice notice--warn prose" data-rich="prereq.warn"></div>
+
+      <ul class="links">
+        <li><a class="link" data-link="notebook"
+               href="https://colab.research.google.com/github/noctetemp/nordwind-workshop/blob/main/session3_graphs_en.ipynb"
+               target="_blank" rel="noopener noreferrer" data-i18n="prereq.notebook"></a></li>
+      </ul>
+
+      <div class="card__actions">
+        <button type="button" class="btn btn--quiet" data-act="back" data-i18n="common.back"></button>
+        <button type="button" class="btn btn--primary" data-act="prereq-done" data-i18n="prereq.done"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── login ────────────────────────────────────────────────────── -->
+  <section class="screen" data-screen="login" hidden>
+    <div class="card card--narrow">
+      <h1 class="card__title" data-i18n="login.title"></h1>
+      <div class="prose" data-rich="login.lead"></div>
+
+      <div class="notice notice--warn prose" data-rich="login.user.warn"></div>
+
+      <form class="form" data-login-form novalidate>
+        <p class="form__err" data-login-err hidden></p>
+
+        <div class="field">
+          <label class="field__label" for="in-uri" data-i18n="login.uri"></label>
+          <input class="field__input mono" id="in-uri" name="uri" type="text"
+                 autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
+                 placeholder="neo4j+s://xxxxxxxx.databases.neo4j.io">
+          <p class="field__hint prose" data-rich="login.uri.hint"></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="in-user" data-i18n="login.user"></label>
+          <input class="field__input mono" id="in-user" name="user" type="text"
+                 autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
+                 placeholder="xxxxxxxx">
+          <p class="field__hint prose" data-rich="login.user.hint"></p>
+          <p class="field__hint field__hint--live prose" data-login-derived hidden></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="in-pw" data-i18n="login.password"></label>
+          <input class="field__input mono" id="in-pw" name="password" type="password"
+                 autocomplete="off" spellcheck="false">
+          <p class="field__hint prose" data-rich="login.password.hint"></p>
+        </div>
+
+        <div class="card__actions">
+          <button type="button" class="btn btn--quiet" data-act="back" data-i18n="common.back"></button>
+          <button type="submit" class="btn btn--primary" data-i18n="login.submit"></button>
+        </div>
+      </form>
+
+      <p class="card__note prose" data-rich="login.privacy"></p>
+    </div>
+  </section>
+
+  <!-- ── connecting ───────────────────────────────────────────────── -->
+  <section class="screen" data-screen="connecting" hidden>
+    <div class="card card--narrow card--center">
+      <div class="pulse" aria-hidden="true"><i></i><i></i><i></i></div>
+      <h1 class="card__title" data-i18n="connecting.title"></h1>
+      <p class="card__lead" data-i18n="connecting.lead"></p>
+      <p class="card__note" data-i18n="connecting.note"></p>
+      <div class="card__actions card__actions--center">
+        <button type="button" class="btn" data-act="cancel-connect" data-i18n="common.cancel"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── precheck ─────────────────────────────────────────────────── -->
+  <section class="screen" data-screen="precheck" hidden>
+    <div class="card">
+      <h1 class="card__title" data-i18n="precheck.title"></h1>
+
+      <div class="stats">
+        <div class="stat">
+          <span class="stat__num" data-pc="nodes">—</span>
+          <span class="stat__cap" data-i18n="precheck.nodes"></span>
+        </div>
+        <div class="stat">
+          <span class="stat__num" data-pc="rels">—</span>
+          <span class="stat__cap" data-i18n="precheck.rels"></span>
+        </div>
+      </div>
+
+      <table class="tbl tbl--counts">
+        <thead>
+          <tr>
+            <th scope="col" data-i18n="precheck.col.label"></th>
+            <th scope="col" class="num" data-i18n="precheck.col.count"></th>
+          </tr>
+        </thead>
+        <tbody data-pc="labels"></tbody>
+      </table>
+
+      <p class="kv">
+        <span class="kv__k" data-i18n="precheck.reltypes"></span>
+        <span class="kv__v mono" data-pc="reltypes"></span>
+      </p>
+
+      <div class="notice" data-pc="verdict">
+        <h2 class="notice__title" data-pc="verdict-title"></h2>
+        <div class="prose" data-pc="verdict-body"></div>
+      </div>
+
+      <div class="card__actions">
+        <button type="button" class="btn btn--quiet" data-act="back"></button>
+        <button type="button" class="btn" data-act="precheck-retry"></button>
+        <button type="button" class="btn btn--primary" data-act="precheck-proceed"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── fatal ────────────────────────────────────────────────────── -->
+  <section class="screen" data-screen="fatal" hidden>
+    <div class="card card--narrow">
+      <p class="card__kicker card__kicker--err" data-fatal="kind"></p>
+      <h1 class="card__title" data-fatal="title"></h1>
+      <div class="prose" data-fatal="body"></div>
+      <details class="details" data-fatal="details" hidden>
+        <summary data-i18n="fatal.detail"></summary>
+        <pre class="details__pre" data-fatal="detail"></pre>
+      </details>
+      <div class="card__actions">
+        <button type="button" class="btn btn--primary" data-act="fatal-retry" data-i18n="fatal.retry"></button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ============================================================
+     アプリ本体
+     ============================================================ -->
+<div id="app" class="app" hidden>
+
+  <header id="topbar" class="topbar">
+    <div class="topbar__title">
+      <span class="topbar__mark" aria-hidden="true"></span>
+      <span data-i18n="app.title">Graph Ladder</span>
+    </div>
+    <div id="topbar-status" class="topbar__status"></div>
+    <nav class="topbar__actions">
+      <div class="seg" role="group" aria-label="view mode">
+        <button type="button" id="btn-view-2d" class="seg__btn is-active" data-view="2d">2D</button>
+        <button type="button" id="btn-view-3d" class="seg__btn" data-view="3d">3D</button>
+      </div>
+      <div class="seg" role="group" aria-label="language">
+        <button type="button" id="btn-lang-ja" class="seg__btn is-active" data-lang="ja">日本語</button>
+        <button type="button" id="btn-lang-en" class="seg__btn" data-lang="en">EN</button>
+      </div>
+      <button type="button" id="btn-theme" class="icon-btn" data-i18n-title="app.theme" title="表示を切り替える"></button>
+      <button type="button" id="btn-reset-view" class="icon-btn" data-i18n-title="app.resetView" title="表示位置を戻す"></button>
+      <button type="button" id="btn-disconnect" class="ghost-btn" data-i18n="app.disconnect">切断</button>
+    </nav>
+  </header>
+
+  <main class="workspace">
+
+    <aside class="sidebar" id="sidebar">
+      <section class="panel" id="ladder-panel">
+        <h2 class="panel__head" data-i18n="ladder.title">ラダー</h2>
+        <div class="panel__body" id="ladder-rows"></div>
+      </section>
+      <section class="panel panel--grow" id="cand-panel">
+        <h2 class="panel__head" data-i18n="cand.title">次の候補</h2>
+        <div class="panel__body" id="cand-rows"></div>
+        <div class="panel__foot" id="cand-foot"></div>
+      </section>
+    </aside>
+
+    <section class="stage" id="stage">
+      <div class="stage__host" id="graph-host"></div>
+      <div class="stage__hint" id="graph-hint"></div>
+      <div class="stage__legend" id="graph-legend"></div>
+    </section>
+
+    <aside class="results" id="results-panel">
+      <h2 class="panel__head" data-i18n="results.title">結果</h2>
+      <div class="panel__body" id="result-rows"></div>
+    </aside>
+
+  </main>
+
+  <footer class="cypherbar" id="cypher-bar">
+    <pre class="cypherbar__code" id="cypher-code"></pre>
+    <div class="cypherbar__meta">
+      <span id="cypher-stats"></span>
+      <button type="button" id="btn-copy-cypher" class="ghost-btn" data-i18n="app.copy">コピー</button>
+    </div>
+  </footer>
+
+  <div id="toast" class="toast" hidden></div>
+</div>
+
+<noscript>
+  <p style="padding:2rem;font:16px system-ui">
+    このツールは JavaScript が必要です。/ This tool requires JavaScript.
+  </p>
+</noscript>
+</body>
+</html>
