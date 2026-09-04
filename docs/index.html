@@ -7,10 +7,14 @@
   依存はすべて vendor/ に同梱してあるので script-src 'self' が張れる。
   このページは Neo4j の資格情報を受け取るので、第三者のスクリプトを同じ実行
   コンテキストに置かない。connect-src は Aura の Bolt over WSS だけを許す。
+  ドライバは必ず「明示ポート付き」の wss://ホスト:7687/ に接続する。Chrome は
+  ポート未指定の host source をデフォルトポート(443)にしかマッチさせないため、
+  :7687 エントリが無いと接続が CSP でブロックされる（→ No routing servers available）。
 -->
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'self';
-  connect-src 'self' wss://*.databases.neo4j.io wss://*.neo4j.io;
+  connect-src 'self' wss://*.databases.neo4j.io:7687 wss://*.databases.neo4j.io
+               wss://*.neo4j.io:7687 wss://*.neo4j.io;
   script-src 'self';
   style-src 'self' 'unsafe-inline';
   img-src 'self' data:;
