@@ -19,7 +19,7 @@
  * すべて textContent で入れる。innerHTML は使わない。
  */
 
-import { t } from './i18n.js';
+import { t, getLang } from './i18n.js';
 import { isRung, rungCount, MAX_RUNGS } from './ladder.js';
 
 const TOAST_MS = 2400;
@@ -343,19 +343,20 @@ export function createPanel(refs, handlers = {}) {
       ladder: [], schema: [], labels: [], labelTotals: {},
       rungs: [], cands: {}, result: {}, hoverEid: null, theme: null, ...state,
     };
+    const lang = getLang();
 
     const next = {
-      ladder: JSON.stringify([s.ladder, s.rungs.map((r) => r.count), s.labelTotals]),
-      cand: JSON.stringify([s.ladder.length, s.labels, s.labelTotals,
+      ladder: JSON.stringify([lang, s.ladder, s.rungs.map((r) => r.count), s.labelTotals]),
+      cand: JSON.stringify([lang, s.ladder.length, s.labels, s.labelTotals,
                             s.cands.rows, errorSig(s.cands.error),
                             !!s.cands.running]),
-      result: JSON.stringify([s.ladder.map((x) => x.label ?? null),
+      result: JSON.stringify([lang, s.ladder.map((x) => x.label ?? null),
                               s.rungs, errorSig(s.result.error),
                               !!s.result.running]),
-      cypher: JSON.stringify([s.result.cypher ?? null, s.result.paths ?? null,
+      cypher: JSON.stringify([lang, s.result.cypher ?? null, s.result.paths ?? null,
                               s.result.ms ?? null, !!s.result.running,
                               errorSig(s.result.error)]),
-      status: JSON.stringify([s.labels, s.labelTotals]),
+      status: JSON.stringify([lang, s.labels, s.labelTotals]),
     };
 
     if (next.ladder !== sig.ladder) keepFocus(ladderRows, () => paintLadder(s));
