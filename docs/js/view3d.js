@@ -20,7 +20,11 @@ import { parseHex, mix, toHex } from './theme.js';
 
 const FOV = 45;
 const FIT_MARGIN = 1.08;
-const NODE_SCALE = 0.016;      // 正規化空間（半径ほぼ1）での大きさに落とす係数
+// theme.js の半径（2D ではピクセル。最大 11 / 最小 4.5）をワールド単位に落とす係数。
+// 2D は fit 時に「最大のノードが約 11px」＝レイアウトの広がりの 2〜3% になるので、
+// 3D もその見え方に揃える。ここを大きくするとノードが互いに埋まり、辺も構造も見えなくなる。
+// 形ごとのジオメトリ自体が半径 1.2〜1.7 を持っているぶんも見込んでいる。
+const NODE_SCALE = 0.006;
 const EDGE_MIN = 0.10;         // 減衰した辺をどこまで背景に寄せるか
 const EDGE_IDLE = 0.42;
 const CAM_TWEEN_SEC = 0.5;
@@ -258,12 +262,23 @@ export function createView(container, { theme }) {
   const ro = new ResizeObserver(() => { resize(); emit('needsframe'); });
   ro.observe(container);
 
+  // 見込む角の縦横どちらが制約になるかを見る。FOV は縦なので、
+  // ステージが縦長のときは横が先にあふれる
+  function fitDistance() {
+    const vFov = (FOV * Math.PI) / 180;
+    const aspect = Math.max(0.2, camera.aspect || 1);
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
+    return Math.max(
+      (radius * FIT_MARGIN) / Math.tan(vFov / 2),
+      (radius * FIT_MARGIN) / Math.tan(hFov / 2)
+    );
+  }
+
   function fitCamera() {
-    const dist = (radius * FIT_MARGIN) / Math.tan((FOV * Math.PI) / 360);
-    return {
-      position: new THREE.Vector3(center.x, center.y - dist * 0.25, center.z + dist),
-      target: center.clone(),
-    };
+    const dist = fitDistance();
+    // 真正面ではなく少しだけ見下ろす。奥行きがあることが一目で分かる程度の傾き
+    const dir = new THREE.Vector3(0, -0.22, 1).normalize().multiplyScalar(dist);
+    return { position: center.clone().add(dir), target: center.clone() };
   }
 
   function applyBackground() {
@@ -280,13 +295,27 @@ export function createView(container, { theme }) {
       styles = g.nodes.map((node) => currentTheme.forLabel(node.label));
       applyBackground();
 
-      // 位置の広がりからカメラの距離を決める
-      const box = new THREE.Box3();
+      // 位置の広がりからカメラの距離を決める。
+      // 注視点はバウンディングボックスの中心ではなく重心にする。
+      // 離れた小さな塊があるとボックスの中心が実際の質量から外れ、
+      // グラフが画面の隅に寄って余白ができる
+      center.set(0, 0, 0);
       for (let i = 0; i < g.nodes.length; i++) {
-        box.expandByPoint(new THREE.Vector3(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]));
+        center.x += pos[i * 3]; center.y += pos[i * 3 + 1]; center.z += pos[i * 3 + 2];
       }
-      box.getCenter(center);
-      radius = Math.max(0.2, box.getSize(new THREE.Vector3()).length() / 2);
+      center.divideScalar(Math.max(1, g.nodes.length));
+
+      // 半径は対角の半分（getSize().length()/2）だと平べったい分布で過大評価になり、
+      // カメラが必要以上に引いてグラフが小さく収まる。重心から一番遠いノードまでを使う
+      let far = 0;
+      for (let i = 0; i < g.nodes.length; i++) {
+        const dx = pos[i * 3] - center.x;
+        const dy = pos[i * 3 + 1] - center.y;
+        const dz = pos[i * 3 + 2] - center.z;
+        const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (d > far) far = d;
+      }
+      radius = Math.max(0.2, far);
 
       // ノードは 1 つずつ Mesh にする。InstancedMesh ではインスタンスごとの色が扱いにくい
       for (const m of meshes) { scene.remove(m); m.material.dispose(); }
@@ -399,7 +428,7 @@ export function createView(container, { theme }) {
         controls.target.fromArray(s.target);
       } else if (Number.isFinite(s.cx) && Number.isFinite(s.k)) {
         const zoom = Number.isFinite(s.zoom) ? Math.max(0.5, Math.min(3, s.zoom)) : 1;
-        const dist = (radius * FIT_MARGIN) / Math.tan((FOV * Math.PI) / 360) / zoom;
+        const dist = fitDistance() / zoom;
         controls.target.set(s.cx, s.cy, 0);
         camera.position.set(s.cx, s.cy - dist * 0.25, center.z + dist);
       }
