@@ -7,7 +7,7 @@
  * 差し替えられるようにしてあるので、Node のドライバを注入すれば
  * ブラウザが読むファイルそのものをここで検証できる。
  *
- * 認証情報は DoNotUpdate/ から実行時に読むだけで、画面には出さない。
+ * 認証情報は DoNotUpload/ から実行時に読むだけで、画面には出さない。
  */
 
 import { readFileSync, readdirSync } from 'node:fs';
@@ -41,7 +41,7 @@ function loadCredentials() {
       password: process.env.NEO4J_PASSWORD,
     };
   }
-  const dir = join(ROOT, 'DoNotUpdate');
+  const dir = join(ROOT, 'DoNotUpload');
   const file = readdirSync(dir).find((f) => f.endsWith('.txt'));
   if (!file) throw new Error(`${dir} に .txt がありません。`);
   const kv = {};

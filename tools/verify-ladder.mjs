@@ -3,7 +3,7 @@
  *
  *   node tools/verify-ladder.mjs
  *
- * 認証情報は DoNotUpdate/ の Aura のファイルから実行時に読むだけで、
+ * 認証情報は DoNotUpload/ の Aura のファイルから実行時に読むだけで、
  * 画面にも出さないしどこにも書かない。--uri/--user/--password/--env でも渡せる。
  */
 
@@ -32,7 +32,7 @@ function loadCredentials() {
   };
   if (fromEnv.uri && fromEnv.password) return fromEnv;
 
-  const dir = join(ROOT, 'DoNotUpdate');
+  const dir = join(ROOT, 'DoNotUpload');
   let files = [];
   try {
     files = readdirSync(dir).filter((f) => f.endsWith('.txt'));

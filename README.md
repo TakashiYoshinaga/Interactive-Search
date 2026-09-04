@@ -80,7 +80,7 @@ npm install
 cd ..
 ```
 
-Aura の認証情報ファイルを `DoNotUpdate/` に置いてから実行します。このディレクトリと `.env` は Git の対象外です。
+Aura の認証情報ファイルを `DoNotUpload/` に置いてから実行します。このディレクトリと `.env` は Git の対象外です。
 
 ```bash
 node tools/verify-ladder.mjs  # ラダー、Cypher、先読み、受け入れ値

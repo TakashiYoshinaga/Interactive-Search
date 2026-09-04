@@ -8,7 +8,7 @@
  * まったく同じ絵になる。実行時に計算しても決定論的なので同じ絵にはなるが、
  * 起動が少し速くなるのと、気に入らない配置を手で直せるのが利点。
  *
- * 認証情報は DoNotUpdate/ から実行時に読むだけで、画面には出さない。
+ * 認証情報は DoNotUpload/ から実行時に読むだけで、画面には出さない。
  */
 
 import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -31,7 +31,7 @@ function loadCredentials() {
       password: process.env.NEO4J_PASSWORD,
     };
   }
-  const dir = join(ROOT, 'DoNotUpdate');
+  const dir = join(ROOT, 'DoNotUpload');
   const files = readdirSync(dir).filter((f) => f.endsWith('.txt'));
   if (!files.length) throw new Error(`${dir} に .txt がありません。`);
   const kv = {};

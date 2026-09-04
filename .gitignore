@@ -1,4 +1,6 @@
 # Neo4j credentials — never commit
+DoNotUpload/
+# 旧綴り。取り違えたフォルダが残っていても守れるように残しておく
 DoNotUpdate/
 Neo4j-*-Created-*.txt
 *.env
