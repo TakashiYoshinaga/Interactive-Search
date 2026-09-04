@@ -16,7 +16,6 @@ const DRAG_SLOP = 4;           // これ以上動いたらクリックではな�
 const CAM_TWEEN_SEC = 0.45;
 const ALWAYS_LABEL_MAX = 16;   // 件数がこれ以下のラベルは常にラベルを出す
 const ZOOM_LABEL_AT = 1.6;     // それ以外は fit の何倍まで寄ったら出すか
-const EDGE_MIN_ALPHA = 0.07;   // 減衰した辺。0 にすると「他も存在している」が消える
 const LABEL_H = 15;           // ラベル1行の高さ（衝突判定用）
 const LABEL_FONT = '11px system-ui, -apple-system, "Segoe UI", "Noto Sans JP", sans-serif';
 
@@ -143,10 +142,10 @@ export function createView(container, { theme }) {
       const a = edge.fromIdx, b = edge.toIdx;
       if (a === undefined || b === undefined) continue;
       const lit = cur.edgeLit[e];
-      const alpha = EDGE_MIN_ALPHA + (v.edgeIdleAlpha - EDGE_MIN_ALPHA) * lit;
+      const alpha = v.edgeDimAlpha + (v.edgeIdleAlpha - v.edgeDimAlpha) * lit;
       if (alpha <= 0.01) continue;
       ctx.globalAlpha = alpha;
-      ctx.strokeStyle = v.dim;
+      ctx.strokeStyle = v.edge;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(toScreenX(pos[a * 2]), toScreenY(pos[a * 2 + 1]));

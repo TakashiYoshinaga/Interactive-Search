@@ -43,9 +43,11 @@ function readVars(root = document.documentElement) {
     hot: v('--hot', '#9a7430'),
     hotSoft: v('--hot-soft', '#c9a45c'),
     dim: v('--dim', '#c3bfb7'),
+    edge: v('--edge', '#8c877d'),
     dimAlpha: num('--dim-alpha', 0.38),
     dimScale: num('--dim-scale', 0.45),
-    edgeIdleAlpha: num('--edge-idle-alpha', 0.3),
+    edgeIdleAlpha: num('--edge-idle-alpha', 0.62),
+    edgeDimAlpha: num('--edge-dim-alpha', 0.14),
     cats: Array.from({ length: CAT_COUNT }, (_, i) => v(`--cat-${i}`, '#888888')),
   };
 }

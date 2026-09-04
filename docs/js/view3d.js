@@ -25,8 +25,6 @@ const FIT_MARGIN = 1.08;
 // 3D もその見え方に揃える。ここを大きくするとノードが互いに埋まり、辺も構造も見えなくなる。
 // 形ごとのジオメトリ自体が半径 1.2〜1.7 を持っているぶんも見込んでいる。
 const NODE_SCALE = 0.006;
-const EDGE_MIN = 0.10;         // 減衰した辺をどこまで背景に寄せるか
-const EDGE_IDLE = 0.42;
 const CAM_TWEEN_SEC = 0.5;
 const FOCUS_DISTANCE = 1.55;
 const PICK_PX = 14;            // 画面上の当たり判定の半径。見た目が縮んでも変えない
@@ -177,13 +175,17 @@ export function createView(container, { theme }) {
 
   function updateEdges(cur) {
     if (!edgeLines) return;
-    const dimRGB = parseHex(currentTheme.vars.dim);
+    const edgeRGB = parseHex(currentTheme.vars.edge);
     const hotRGB = parseHex(currentTheme.vars.hot);
+    const idleA = currentTheme.vars.edgeIdleAlpha;
+    const dimA = currentTheme.vars.edgeDimAlpha;
     for (let e = 0; e < graph.edges.length; e++) {
       const lit = cur.edgeLit[e];
       const hot = cur.edgeHot[e];
-      const strength = EDGE_MIN + (EDGE_IDLE - EDGE_MIN) * lit;
-      let c = mix(bgRGB, dimRGB, strength);
+      // 辺の色は「背景から --edge へどれだけ寄せるか」で表す（半透明の描画順を避けるため）。
+      // 背景が不透明な単色なので 2D の alpha と同じ数式になり、同じトークンで揃う
+      const strength = dimA + (idleA - dimA) * lit;
+      let c = mix(bgRGB, edgeRGB, strength);
       if (hot > 0.02) c = mix(c, hotRGB, hot);
       const r = c[0] / 255, g = c[1] / 255, b = c[2] / 255;
       const o = e * 6;
