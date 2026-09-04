@@ -30,6 +30,8 @@ const NODE_SCALE = 0.006;
 const NODE_LIFT = 0.16;
 const CAM_TWEEN_SEC = 0.5;
 const FOCUS_DISTANCE = 1.55;
+// カメラを注視点より上に置く量（距離に対する比）。正で見下ろし、負で見上げになる
+const TILT = 0.22;
 const PICK_PX = 14;            // 画面上の当たり判定の半径。見た目が縮んでも変えない
 const LABEL_H = 15;
 const LABEL_GAP = 3;
@@ -284,8 +286,10 @@ export function createView(container, { theme }) {
 
   function fitCamera() {
     const dist = fitDistance();
-    // 真正面ではなく少しだけ見下ろす。奥行きがあることが一目で分かる程度の傾き
-    const dir = new THREE.Vector3(0, -0.22, 1).normalize().multiplyScalar(dist);
+    // 真正面ではなく少しだけ見下ろす。奥行きがあることが一目で分かる程度の傾き。
+    // y は必ず正（カメラを上に置く）。負にするとグラフを下から見上げることになり、
+    // 傾きが逆向きになって「上下が反転している」ように見える
+    const dir = new THREE.Vector3(0, TILT, 1).normalize().multiplyScalar(dist);
     return { position: center.clone().add(dir), target: center.clone() };
   }
 
@@ -438,7 +442,7 @@ export function createView(container, { theme }) {
         const zoom = Number.isFinite(s.zoom) ? Math.max(0.5, Math.min(3, s.zoom)) : 1;
         const dist = fitDistance() / zoom;
         controls.target.set(s.cx, s.cy, 0);
-        camera.position.set(s.cx, s.cy - dist * 0.25, center.z + dist);
+        camera.position.set(s.cx, s.cy + dist * TILT, center.z + dist);
       }
       controlsMoving = controls.update();
     },
