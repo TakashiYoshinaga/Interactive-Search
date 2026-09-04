@@ -53,6 +53,7 @@ const DICT = {
     'splash.start': 'はじめる',
     'splash.note':
       '先にノートブックでデータを投入しておく必要があります。次の画面で確認します。',
+    'splash.author': '作者 — Takashi Yoshinaga',
 
     // ── prereq ────────────────────────────────────────────────────────
     'prereq.title': '先に Colab でデータを投入してください',
@@ -226,6 +227,7 @@ const DICT = {
     'splash.start': 'Start',
     'splash.note':
       'You need to have loaded the data from the notebook first. The next screen walks through it.',
+    'splash.author': 'Author — Takashi Yoshinaga',
 
     'prereq.title': 'Load the data in Colab first',
     'prereq.lead':

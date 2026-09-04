@@ -395,6 +395,22 @@ code {
 }
 .card__note p { margin: 0; font-size: 12px; color: var(--fg-faint); }
 
+/* 作者へのリンク。主張しないが、たどれるように */
+.card__author {
+  margin: 16px 0 0;
+  font-size: 11px;
+}
+.card__author a {
+  color: var(--fg-faint);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 1px;
+}
+.card__author a:hover {
+  color: var(--fg-mute);
+  border-bottom-color: var(--fg-faint);
+}
+
 .prose p {
   margin: 0 0 10px;
   color: var(--fg-mute);

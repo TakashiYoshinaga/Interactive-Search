@@ -1,9 +1,11 @@
 # Graph Ladder
 
+[English](README.en.md) | 日本語
+
 ボタンでグラフのパターンを積み上げながら、生成された Cypher と検索結果を同時に確認できる学習ツールです。
 [nordwind-workshop](https://github.com/noctetemp/nordwind-workshop) の Session 3（グラフデータベース回）で使うことを想定しています。
 
-**[Graph Ladder を開く](https://takashiyoshinaga.github.io/Interactive-Search/)**
+**[体験ページを開く](https://takashiyoshinaga.github.io/Interactive-Search/)**
 
 ブラウザから自分の Neo4j AuraDB へ直接接続します。中継サーバはありません。
 
@@ -33,7 +35,7 @@ Aura インスタンス作成時にダウンロードした認証情報ファイ
 
 ## 使い方
 
-1. Graph Ladder を開き、事前準備の確認後に BOLT URI と PASSWORD を入力します。
+1. 体験ページを開き、事前準備の確認後に BOLT URI と PASSWORD を入力します。
 2. 「次の候補」から起点ラベルを選び、リレーションと次のラベルを追加します。
 3. 下部に生成される Cypher、各段の件数、右側の結果、中央のグラフを見比べます。
 4. グラフ上のノードをクリックすると末尾の段をそのノードに固定できます。もう一度クリックすると解除できます。
@@ -51,6 +53,8 @@ DEPENDS_ON を ×1..2 に変更                       18 / 30 · 11 / 20 ·  4 /
 ```
 
 ## ローカルで開く
+
+セットアップは要りません。**試すだけなら [体験ページ](https://takashiyoshinaga.github.io/Interactive-Search/) をそのまま開いてください。** 以下は手元のコードを動かす場合の手順です。
 
 ES Modules を使うため、`docs/index.html` を `file://` で直接開くことはできません。リポジトリのルートで次を実行します。
 
