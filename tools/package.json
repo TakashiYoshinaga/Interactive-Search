@@ -1,0 +1,9 @@
+{
+  "name": "interactive-search-tools",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only verification and baking scripts. Not part of the published site.",
+  "dependencies": {
+    "neo4j-driver": "5.28.1"
+  }
+}

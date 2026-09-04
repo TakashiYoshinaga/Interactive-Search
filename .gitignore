@@ -1,0 +1,20 @@
+# Neo4j credentials — never commit
+DoNotUpdate/
+Neo4j-*-Created-*.txt
+*.env
+.env
+.env.*
+
+# Dev tooling
+tools/node_modules/
+node_modules/
+package-lock.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+
+# 開発メモ（ローカル専用・公開しない）
+PLAN.md
