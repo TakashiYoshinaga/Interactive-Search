@@ -5,7 +5,7 @@ English | [日本語](README.md)
 A learning tool that lets you stack up a graph pattern with buttons and watch the generated Cypher and its results at the same time. It is meant for session 3 (the graph database session) of [nordwind-workshop](https://github.com/noctetemp/nordwind-workshop).
 
 - **Graph Ladder demo**  
-  [![Graph Ladder demo](https://img.youtube.com/vi/KdaxUFWXK8Q/0.jpg)](https://www.youtube.com/watch?v=KdaxUFWXK8Q)
+  [![Graph Ladder demo](https://img.youtube.com/vi/v12C1AXuJkk/0.jpg)](https://www.youtube.com/watch?v=v12C1AXuJkk)
 
 **[Open the live demo](https://takashiyoshinaga.github.io/Interactive-Search/)**
 
