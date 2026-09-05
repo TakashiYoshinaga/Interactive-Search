@@ -6,9 +6,15 @@
 [nordwind-workshop](https://github.com/noctetemp/nordwind-workshop) の Session 3（グラフデータベース回）で使うことを想定しています。
 
 - **Graph Ladder デモ (クリックで再生)**  
-  [![Graph Ladder デモ](https://img.youtube.com/vi/pRG5rMNnSj8/0.jpg)](https://www.youtube.com/watch?v=pRG5rMNnSj8)
+  [![Graph Ladder デモ](https://img.youtube.com/vi/KdaxUFWXK8Q/0.jpg)](https://www.youtube.com/watch?v=KdaxUFWXK8Q)
 
 **[体験ページを開く](https://takashiyoshinaga.github.io/Interactive-Search/)**
+
+## このコンテンツで体験できること
+
+このコンテンツでは、あるシステムで起きていることを、グラフのつながりを手がかりに調べる流れを体験できます。データには、稼働中のサービス、それを開発したエンジニアやチーム、各サービスに関連するインシデントが含まれています。
+
+たとえば「`payment-gateway` に依存するサービスに関するインシデントは何か」という問いから始め、画面上で関係を一段ずつ選んでいくと、Cypher クエリが組み上がります。その検索結果と該当する経路が 2D / 3D グラフに反映されるため、クエリとデータのつながりを見比べながら学べます。
 
 ## できること
 

@@ -5,9 +5,15 @@ English | [日本語](README.md)
 A learning tool that lets you stack up a graph pattern with buttons and watch the generated Cypher and its results at the same time. It is meant for session 3 (the graph database session) of [nordwind-workshop](https://github.com/noctetemp/nordwind-workshop).
 
 - **Graph Ladder demo**  
-  [![Graph Ladder demo](https://img.youtube.com/vi/pRG5rMNnSj8/0.jpg)](https://www.youtube.com/watch?v=pRG5rMNnSj8)
+  [![Graph Ladder demo](https://img.youtube.com/vi/KdaxUFWXK8Q/0.jpg)](https://www.youtube.com/watch?v=KdaxUFWXK8Q)
 
 **[Open the live demo](https://takashiyoshinaga.github.io/Interactive-Search/)**
+
+## What you will experience
+
+This content lets you investigate what is happening in a system by following connections in a graph. The data links running services with the engineers and teams that built them, as well as the incidents associated with each service.
+
+Start with a question such as "Which incidents involve services that depend on `payment-gateway`?" As you select relationships one step at a time, Graph Ladder builds the Cypher query for you. Its results and matching paths appear in the 2D / 3D graph, so you can learn by comparing the query with the data it reaches.
 
 ## What it does
 
