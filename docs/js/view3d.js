@@ -20,6 +20,8 @@ import { parseHex, mix, toHex } from './theme.js';
 
 const FOV = 45;
 const FIT_MARGIN = 1.08;
+// カメラ空間の右・上・手前。角度の調整はこの定数だけで行う。
+const LIGHT_OFFSET = new THREE.Vector3(0.5, 0.7, 1.2);
 // theme.js の半径（2D ではピクセル。最大 11 / 最小 4.5）をワールド単位に落とす係数。
 // 2D は fit 時に「最大のノードが約 11px」＝レイアウトの広がりの 2〜3% になるので、
 // 3D もその見え方に揃える。ここを大きくするとノードが互いに埋まり、辺も構造も見えなくなる。
@@ -33,13 +35,17 @@ const FOCUS_DISTANCE = 1.55;
 // カメラを注視点より上に置く量（距離に対する比）。正で見下ろし、負で見上げになる
 const TILT = 0.22;
 const PICK_PX = 14;            // 画面上の当たり判定の半径。見た目が縮んでも変えない
-const LABEL_H = 15;
-const LABEL_GAP = 3;
+const LABEL_MAX_WIDTH = 240;
+const LABEL_GAP = 4;
+const CURSOR_LABEL_GAP = 12;
+const MATCHED_EDGE_PX = 2.2;
 
 const WHITE = [255, 255, 255];
 
 export function createView(container, { theme }) {
   let currentTheme = theme;
+  let showAllLabels = false;
+  let viewportHeight = 1;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -49,7 +55,7 @@ export function createView(container, { theme }) {
 
   const labelRenderer = new CSS2DRenderer();
   labelRenderer.domElement.style.cssText =
-    'position:absolute;inset:0;pointer-events:none;overflow:hidden';
+    'position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden';
   container.appendChild(labelRenderer.domElement);
 
   const scene = new THREE.Scene();
@@ -58,10 +64,10 @@ export function createView(container, { theme }) {
   controls.enableDamping = true;
   controls.dampingFactor = 0.12;
 
+  // 視点追従後も減光が気になる場合のみ、受け入れ確認で半球光の強度を調整する。
   scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8a8a, 1.15));
   const key = new THREE.DirectionalLight(0xffffff, 0.62);
-  key.position.set(1.2, 1.6, 1.4);
-  scene.add(key);
+  scene.add(key, key.target);  // target の matrixWorld も render 時に更新する。
 
   const listeners = { nodeclick: [], nodehover: [], bgclick: [], needsframe: [] };
   const emit = (name, arg) => (listeners[name] || []).forEach((fn) => fn(arg));
@@ -71,13 +77,16 @@ export function createView(container, { theme }) {
   let styles = [];
   let meshes = [];
   let labels = [];
+  let labelSizes = [];
   let edgeLines = null;
   let edgeColors = null;
+  let edgeHighlights = null;
   let bgRGB = [243, 241, 236];
   let radius = 1;
   let center = new THREE.Vector3();
   let camTween = null;
   let hoverIdx = -1;
+  let hoverPointer = null;       // グラフ上のホバーだけが持つ client 座標。結果欄のホバーとは区別する
   let dragMoved = 0;
   let pointerDown = null;
   let controlsMoving = false;
@@ -96,6 +105,7 @@ export function createView(container, { theme }) {
       case 'cross': g = new THREE.IcosahedronGeometry(1.2, 0); break;
       default: g = new THREE.SphereGeometry(1, 20, 14);
     }
+    g.computeBoundingSphere();
     geomCache.set(shape, g);
     return g;
   }
@@ -104,12 +114,14 @@ export function createView(container, { theme }) {
   function nodeScale(i, cur) {
     const s = styles[i];
     const dimScale = currentTheme.vars.dimScale;
+    const visibility = Math.max(cur.nodeLit[i], cur.nodeHover[i], cur.nodeNeighbor[i], cur.nodePin[i]);
     const accentScale = Math.max(
       1 + (currentTheme.hoverScale - 1) * cur.nodeHover[i],
-      1 + (currentTheme.pinScale - 1) * cur.nodePin[i]
+      1 + (currentTheme.pinScale - 1) * cur.nodePin[i],
+      1 + 0.12 * cur.nodeNeighbor[i]
     );
     return s.radius * NODE_SCALE * radius
-      * (dimScale + (1 - dimScale) * cur.nodeLit[i])
+      * (dimScale + (1 - dimScale) * visibility)
       * (1 + (currentTheme.hotScale - 1) * cur.nodeHot[i])
       * accentScale;
   }
@@ -119,7 +131,7 @@ export function createView(container, { theme }) {
     const hotRGB = parseHex(currentTheme.vars.hot);
     for (let i = 0; i < meshes.length; i++) {
       const m = meshes[i];
-      const lit = cur.nodeLit[i];
+      const lit = Math.max(cur.nodeLit[i], cur.nodeNeighbor[i]);
       const accent = Math.max(cur.nodeHover[i], cur.nodePin[i]);
       const s = nodeScale(i, cur);
       m.scale.setScalar(s);
@@ -141,43 +153,109 @@ export function createView(container, { theme }) {
     }
   }
 
-  /** 強調中のラベルを画面空間で間引く。ピンとホバーは常に残す。 */
+  /** 通常はホバー・接続先・ピンのみ。その他の名前は「すべて表示」で追加する。 */
   function updateLabels(cur) {
     if (!graph) return;
     const rect = renderer.domElement.getBoundingClientRect();
+    const focalPixels = rect.height / (2 * Math.tan(FOV * Math.PI / 360));
     const candidates = [];
+    let hoverStrength = 0;
     for (let i = 0; i < graph.nodes.length; i++) {
-      const accent = Math.max(cur.nodeHover[i], cur.nodePin[i]);
-      const focus = Math.max(cur.nodeHot[i], accent);
+      const hover = cur.nodeHover[i];
+      hoverStrength = Math.max(hoverStrength, hover);
+      const pointer = i === hoverIdx ? hoverPointer : null;
+      const neighbor = cur.nodeNeighbor[i];
+      const ambient = showAllLabels ? 0.45 + 0.55 * cur.nodeLit[i] : 0;
+      const focus = Math.max(ambient, hover, neighbor, cur.nodePin[i], pointer ? 1 : 0);
+      labels[i].element.style.opacity = '0';
       if (focus <= 0.25) {
-        labels[i].element.style.opacity = '0';
         continue;
       }
       projected.set(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]).project(camera);
       if (projected.z < -1 || projected.z > 1) {
-        labels[i].element.style.opacity = '0';
         continue;
       }
       const x = (projected.x * 0.5 + 0.5) * rect.width;
       const y = (-projected.y * 0.5 + 0.5) * rect.height;
-      const w = Math.min(rect.width * 0.32, Math.max(32, graph.nodes[i].name.length * 6.2));
-      candidates.push({ i, x, y, w, focus, accent, priority: accent * 10 + cur.nodeHot[i] });
+      if (x < 0 || x > rect.width || y < 0 || y > rect.height) continue;
+      const { w, h } = labelSizes[i];
+      const depth = -cameraSpace.copy(meshes[i].position).applyMatrix4(camera.matrixWorldInverse).z;
+      const r = meshes[i].geometry.boundingSphere.radius * meshes[i].scale.x * focalPixels / depth;
+      const priority = pointer ? 5 : hover > 0.25 ? 4 : neighbor > 0.25 ? 3 : cur.nodePin[i] > 0.25 ? 2 : 1;
+      candidates.push({ i, x, y, w, h, r, focus, hover, priority, pointer });
     }
-    candidates.sort((a, b) => b.priority - a.priority || a.i - b.i);
+    candidates.sort((a, b) => b.priority - a.priority || b.hover - a.hover || a.i - b.i);
     const placed = [];
+    const nodeBoxes = candidates.filter((item) => item.priority >= 3).map((item) => ({
+      x0: item.x - item.r, y0: item.y - item.r, x1: item.x + item.r, y1: item.y + item.r,
+    }));
+    // 操作ヒントと名前の切り替えには重ねない。
+    for (const hint of container.parentElement?.querySelectorAll('.stage__hint, .stage__labels') || []) {
+      const h = hint.getBoundingClientRect();
+      placed.push({ x0: h.left - rect.left, y0: h.top - rect.top,
+                    x1: h.right - rect.left, y1: h.bottom - rect.top });
+    }
+    const overlaps = (box, other) => box.x0 < other.x1 && box.x1 > other.x0
+      && box.y0 < other.y1 && box.y1 > other.y0;
     for (const item of candidates) {
-      const box = {
-        x0: item.x - item.w / 2 + 8 - LABEL_GAP,
-        x1: item.x + item.w / 2 + 8 + LABEL_GAP,
-        y0: item.y - LABEL_H / 2 - LABEL_GAP,
-        y1: item.y + LABEL_H / 2 + LABEL_GAP,
-      };
-      const collision = placed.some((other) =>
-        box.x0 < other.x1 && box.x1 > other.x0 && box.y0 < other.y1 && box.y1 > other.y0
-      );
-      const visible = item.accent > 0.25 || !collision;
-      labels[item.i].element.style.opacity = visible ? String(Math.min(1, item.focus)) : '0';
-      if (visible) placed.push(box);
+      let spot = null;
+      if (item.pointer) {
+        // 対象名はカーソルの近くを先に確保する。ノードの密集を理由に遠くへ逃がさない。
+        const px = item.pointer.x - rect.left, py = item.pointer.y - rect.top;
+        const right = px + CURSOR_LABEL_GAP, left = px - CURSOR_LABEL_GAP - item.w;
+        const below = py + CURSOR_LABEL_GAP, above = py - CURSOR_LABEL_GAP - item.h;
+        for (const [x, y] of [[right, below], [left, below], [right, above], [left, above]]) {
+          const box = { x0: x - LABEL_GAP, y0: y - LABEL_GAP,
+                        x1: x + item.w + LABEL_GAP, y1: y + item.h + LABEL_GAP };
+          if (box.x0 < 0 || box.y0 < 0 || box.x1 > rect.width || box.y1 > rect.height) continue;
+          if (placed.some((other) => overlaps(box, other))) continue;
+          spot = { x, y, box };
+          break;
+        }
+        if (!spot) {
+          const x = Math.max(LABEL_GAP, Math.min(rect.width - item.w - LABEL_GAP, right));
+          const y = Math.max(LABEL_GAP, Math.min(rect.height - item.h - LABEL_GAP, below));
+          spot = { x, y, box: { x0: x - LABEL_GAP, y0: y - LABEL_GAP,
+                               x1: x + item.w + LABEL_GAP, y1: y + item.h + LABEL_GAP } };
+        }
+      }
+      const gap = Math.max(10, item.r + 6);
+      const gaps = item.priority >= 3 ? [gap, gap + Math.max(item.w / 2, item.h) + LABEL_GAP] : [gap];
+      const spots = gaps.flatMap((distance) => [
+        [item.x + distance, item.y - item.h / 2],
+        [item.x - distance - item.w, item.y - item.h / 2],
+        [item.x - item.w / 2, item.y - distance - item.h],
+        [item.x - item.w / 2, item.y + distance],
+        [item.x + distance, item.y - distance - item.h],
+        [item.x - distance - item.w, item.y - distance - item.h],
+        [item.x + distance, item.y + distance],
+        [item.x - distance - item.w, item.y + distance],
+      ]);
+      for (const [x, y] of spots) {
+        if (spot) break;
+        const box = { x0: x - LABEL_GAP, y0: y - LABEL_GAP,
+                      x1: x + item.w + LABEL_GAP, y1: y + item.h + LABEL_GAP };
+        if (box.x0 < 0 || box.y0 < 0 || box.x1 > rect.width || box.y1 > rect.height) continue;
+        if (placed.some((other) => overlaps(box, other)) || nodeBoxes.some((other) => overlaps(box, other))) continue;
+        spot = { x, y, box };
+        break;
+      }
+      // 画面端や密集部でもホバー対象の名前だけは残す。
+      if (!spot && item.priority === 4) {
+        const x = Math.max(LABEL_GAP, Math.min(rect.width - item.w - LABEL_GAP, spots[0][0]));
+        const y = Math.max(LABEL_GAP, Math.min(rect.height - item.h - LABEL_GAP, spots[0][1]));
+        spot = { x, y, box: { x0: x - LABEL_GAP, y0: y - LABEL_GAP,
+                             x1: x + item.w + LABEL_GAP, y1: y + item.h + LABEL_GAP } };
+      }
+      if (!spot) continue;
+      placed.push(spot.box);
+      const label = labels[item.i];
+      label.renderOrder = item.priority;
+      label.element.firstElementChild.style.transform = `translate(${spot.x - item.x}px, ${spot.y - item.y}px)`;
+      label.element.firstElementChild.classList.toggle('is-hover', item.priority >= 4);
+      label.element.firstElementChild.classList.toggle('is-neighbor', item.priority === 3);
+      const contextAlpha = item.priority >= 3 ? 1 : 1 - hoverStrength * (item.priority === 2 ? 0.35 : 0.6);
+      label.element.style.opacity = String(Math.min(1, item.focus) * contextAlpha);
     }
   }
 
@@ -185,26 +263,73 @@ export function createView(container, { theme }) {
     if (!edgeLines) return;
     const edgeRGB = parseHex(currentTheme.vars.edge3d);
     const hotRGB = parseHex(currentTheme.vars.hot);
+    const hoverRGB = parseHex(currentTheme.vars.fg);
     const idleA = currentTheme.vars.edge3dIdleAlpha;
     const dimA = currentTheme.vars.edge3dDimAlpha;
+    const focalPixels = viewportHeight / (2 * Math.tan(FOV * Math.PI / 360));
+    let highlighted = 0;
     for (let e = 0; e < graph.edges.length; e++) {
       const lit = cur.edgeLit[e];
-      const hot = cur.edgeHot[e];
+      const hover = cur.edgeHover[e];
+      const hot = Math.max(cur.edgeHot[e], hover);
       // 辺の色は「背景から --edge へどれだけ寄せるか」で表す（半透明の描画順を避けるため）。
       // 背景が不透明な単色なので 2D の alpha と同じ数式になり、同じトークンで揃う
       const strength = dimA + (idleA - dimA) * lit;
       let c = mix(bgRGB, edgeRGB, strength);
       if (hot > 0.02) c = mix(c, hotRGB, hot);
-      const r = c[0] / 255, g = c[1] / 255, b = c[2] / 255;
+      // ホバーの接続線はテーマの文字色へ寄せ、金色の検索結果と区別する。
+      if (hover > 0.02) c = mix(c, hoverRGB, hover);
+      // CSS と同じ sRGB で混ぜた色を、頂点色・インスタンス色用の線形 RGB へ変換する。
+      // 生の sRGB 値を渡すと出力時に再び明るくなり、背景へ溶かした暗い線まで浮き上がる。
+      edgeColor.setRGB(c[0] / 255, c[1] / 255, c[2] / 255, THREE.SRGBColorSpace);
+      const { r, g, b } = edgeColor;
       const o = e * 6;
       edgeColors[o] = r; edgeColors[o + 1] = g; edgeColors[o + 2] = b;
       edgeColors[o + 3] = r; edgeColors[o + 4] = g; edgeColors[o + 5] = b;
+      if (hot <= 0.02) continue;
+      const { fromIdx, toIdx } = graph.edges[e];
+      if (fromIdx === undefined || toIdx === undefined) continue;
+      edgeStart.fromArray(pos, fromIdx * 3);
+      edgeEnd.fromArray(pos, toIdx * 3);
+      edgeDirection.subVectors(edgeEnd, edgeStart);
+      const length = edgeDirection.length();
+      if (length < 1e-8) continue;
+      edgeMidpoint.addVectors(edgeStart, edgeEnd).multiplyScalar(0.5);
+      const depth = Math.max(camera.near, -cameraSpace.copy(edgeMidpoint).applyMatrix4(camera.matrixWorldInverse).z);
+      // WebGL の linewidth に頼らず細い円柱で描く。中央の奥行きから見かけの太さを揃える。
+      const thickness = MATCHED_EDGE_PX * 0.5 * depth / focalPixels * hot;
+      edgeRotation.setFromUnitVectors(EDGE_UP, edgeDirection.divideScalar(length));
+      edgeScale.set(thickness, length, thickness);
+      edgeMatrix.compose(edgeMidpoint, edgeRotation, edgeScale);
+      edgeHighlights.setMatrixAt(highlighted, edgeMatrix);
+      edgeHighlights.setColorAt(highlighted, edgeColor);
+      highlighted++;
     }
     edgeLines.geometry.attributes.color.needsUpdate = true;
+    edgeHighlights.count = highlighted;
+    edgeHighlights.visible = highlighted > 0;
+    edgeHighlights.instanceMatrix.needsUpdate = true;
+    if (edgeHighlights.instanceColor) edgeHighlights.instanceColor.needsUpdate = true;
+  }
+
+  const EDGE_UP = new THREE.Vector3(0, 1, 0);
+  const edgeStart = new THREE.Vector3(), edgeEnd = new THREE.Vector3();
+  const edgeDirection = new THREE.Vector3(), edgeMidpoint = new THREE.Vector3();
+  const edgeRotation = new THREE.Quaternion(), edgeScale = new THREE.Vector3();
+  const edgeMatrix = new THREE.Matrix4(), edgeColor = new THREE.Color();
+
+  function clearEdgeHighlights() {
+    if (!edgeHighlights) return;
+    scene.remove(edgeHighlights);
+    edgeHighlights.geometry.dispose();
+    edgeHighlights.material.dispose();
+    edgeHighlights.dispose();
+    edgeHighlights = null;
   }
 
   // ── ピッキング。2D と同じ「画面上の一定半径」にする ───────────────────────
   const projected = new THREE.Vector3();
+  const cameraSpace = new THREE.Vector3();
   function hitTestAt(sx, sy) {
     if (!graph) return -1;
     const rect = renderer.domElement.getBoundingClientRect();
@@ -225,7 +350,12 @@ export function createView(container, { theme }) {
     return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
   };
 
-  function onPointerDown(ev) { pointerDown = localPoint(ev); dragMoved = 0; }
+  function onPointerDown(ev) {
+    pointerDown = localPoint(ev);
+    dragMoved = 0;
+    hoverPointer = null;
+    emit('needsframe');
+  }
   function onPointerMove(ev) {
     const p = localPoint(ev);
     if (pointerDown) {
@@ -235,10 +365,14 @@ export function createView(container, { theme }) {
       return;
     }
     const idx = hitTestAt(p.x, p.y);
+    hoverPointer = idx >= 0 ? { x: ev.clientX, y: ev.clientY } : null;
     renderer.domElement.style.cursor = idx >= 0 ? 'pointer' : 'grab';
     if (idx !== hoverIdx) {
       hoverIdx = idx;
       emit('nodehover', idx >= 0 ? graph.nodes[idx] : null);
+    } else if (idx >= 0) {
+      // ホバー先が同じでも、カーソルの移動分だけ名前を追従させる。
+      emit('needsframe');
     }
   }
   function onPointerUp(ev) {
@@ -251,23 +385,39 @@ export function createView(container, { theme }) {
     else emit('bgclick', null);
   }
   function onPointerLeave() {
+    hoverPointer = null;
     if (hoverIdx !== -1) { hoverIdx = -1; emit('nodehover', null); }
+  }
+  function onPointerCancel() {
+    pointerDown = null;
+    onPointerLeave();
   }
 
   renderer.domElement.addEventListener('pointerdown', onPointerDown);
   renderer.domElement.addEventListener('pointermove', onPointerMove);
   renderer.domElement.addEventListener('pointerup', onPointerUp);
   renderer.domElement.addEventListener('pointerleave', onPointerLeave);
+  renderer.domElement.addEventListener('pointercancel', onPointerCancel);
   controls.addEventListener('change', () => emit('needsframe'));
 
   function resize() {
     const rect = container.getBoundingClientRect();
     const w = Math.max(1, Math.round(rect.width));
     const h = Math.max(1, Math.round(rect.height));
+    viewportHeight = h;
     renderer.setSize(w, h, false);
     labelRenderer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    // 書き込みと寸法の読み取りを分け、文字計測はサイズ変更時だけ行う。
+    for (const label of labels) {
+      label.element.style.maxWidth = `${Math.min(LABEL_MAX_WIDTH, Math.max(1, w - 2 * LABEL_GAP))}px`;
+      label.element.style.display = '';
+    }
+    labelSizes = labels.map((label) => ({
+      w: label.element.firstElementChild.offsetWidth,
+      h: label.element.firstElementChild.offsetHeight,
+    }));
   }
   const ro = new ResizeObserver(() => { resize(); emit('needsframe'); });
   ro.observe(container);
@@ -330,6 +480,7 @@ export function createView(container, { theme }) {
       radius = Math.max(0.2, far);
 
       // ノードは 1 つずつ Mesh にする。InstancedMesh ではインスタンスごとの色が扱いにくい
+      for (const label of labels) label.removeFromParent();
       for (const m of meshes) { scene.remove(m); m.material.dispose(); }
       meshes = [];
       labels = [];
@@ -343,12 +494,14 @@ export function createView(container, { theme }) {
         meshes.push(mesh);
 
         const el = document.createElement('div');
-        el.textContent = g.nodes[i].name;
-        el.style.cssText = 'font:11px system-ui,-apple-system,"Segoe UI","Noto Sans JP",sans-serif;'
-          + `color:${currentTheme.vars.fg};white-space:nowrap;opacity:0;`
-          + 'transform:translateX(10px);text-shadow:0 0 3px ' + currentTheme.vars.bgStage
-          + ',0 0 3px ' + currentTheme.vars.bgStage + ';pointer-events:none';
+        el.className = 'graph-label-anchor';
+        const text = document.createElement('span');
+        text.className = 'graph-label';
+        text.textContent = g.nodes[i].name;
+        el.append(text);
+        labelRenderer.domElement.append(el);
         const label = new CSS2DObject(el);
+        label.center.set(0, 0);
         mesh.add(label);
         labels.push(label);
       }
@@ -369,6 +522,13 @@ export function createView(container, { theme }) {
       edgeLines = new THREE.LineSegments(geom,
         new THREE.LineBasicMaterial({ vertexColors: true }));
       scene.add(edgeLines);
+      clearEdgeHighlights();
+      edgeHighlights = new THREE.InstancedMesh(
+        new THREE.CylinderGeometry(1, 1, 1, 6), new THREE.MeshBasicMaterial(), g.edges.length);
+      edgeHighlights.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      edgeHighlights.count = 0;
+      edgeHighlights.frustumCulled = false;
+      scene.add(edgeHighlights);
 
       resize();
       const fit = fitCamera();
@@ -377,16 +537,13 @@ export function createView(container, { theme }) {
       controlsMoving = controls.update();
     },
 
+    setShowAllLabels(show) { showAllLabels = !!show; },
+
     setTheme(next) {
       currentTheme = next;
       applyBackground();
       if (!graph) return;
       styles = graph.nodes.map((node) => currentTheme.forLabel(node.label));
-      for (const label of labels) {
-        label.element.style.color = currentTheme.vars.fg;
-        label.element.style.textShadow =
-          `0 0 3px ${currentTheme.vars.bgStage},0 0 3px ${currentTheme.vars.bgStage}`;
-      }
     },
 
     frame(dt, cur) {
@@ -398,6 +555,10 @@ export function createView(container, { theme }) {
         if (camTween.t >= 1) camTween = null;
       }
       controlsMoving = controls.update();
+      camera.updateMatrixWorld();
+      // 回転・パン・フォーカス中も、注視点をカメラのやや右上から照らす。
+      key.position.copy(LIGHT_OFFSET).applyQuaternion(camera.quaternion).add(controls.target);
+      key.target.position.copy(controls.target);
       updateNodes(cur);
       updateEdges(cur);
       renderer.render(scene, camera);
@@ -465,10 +626,12 @@ export function createView(container, { theme }) {
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
       renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
+      renderer.domElement.removeEventListener('pointercancel', onPointerCancel);
       for (const m of meshes) { scene.remove(m); m.material.dispose(); }
       for (const g of geomCache.values()) g.dispose();
       geomCache.clear();
       if (edgeLines) { scene.remove(edgeLines); edgeLines.geometry.dispose(); edgeLines.material.dispose(); }
+      clearEdgeHighlights();
       renderer.dispose();
       renderer.domElement.remove();
       labelRenderer.domElement.remove();

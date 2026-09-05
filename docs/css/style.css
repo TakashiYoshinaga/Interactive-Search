@@ -41,12 +41,11 @@
   --edge-idle-alpha: 0.62;   /* ラダー未選択のとき */
   --edge-dim-alpha:  0.20;   /* 絞り込みで減衰したとき。0 にすると「他も存在している」が消える */
 
-  /* 3D の辺は 2D より濃く、ほぼ黒に寄せる。2D は件数の少ないラベルのラベルを
-     常時出しているので線まで真っ黒にすると騒がしくなるが、3D は未選択時に
-     ラベルを出さないので線が濃くても成立し、濃いほうが奥行きも読みやすい */
+  /* 3D は暗い線色を背景へ混ぜる。通常の線は読める濃さ、検索対象外は気配だけ残す。
+     sRGB → 線形 RGB の変換を揃えた上で、明るい背景での従来の薄さを保つ */
   --edge-3d:            #2f2c27;
-  --edge-3d-idle-alpha: 0.80;
-  --edge-3d-dim-alpha:  0.26;
+  --edge-3d-idle-alpha: 0.42;
+  --edge-3d-dim-alpha:  0.08;
 
   /* ラベルのパレット（マットで彩度低め） */
   --cat-0: #4a7a9b;   /* くすんだ青 */
@@ -96,8 +95,8 @@
   --edge-idle-alpha: 0.62;
   --edge-dim-alpha:  0.18;
 
-  /* 暗い背景では「黒系」は成立しない（背景に沈む）ので、明るい側へ離したまま。
-     3D は投影で線が密に重なるので 2D より強くしないこと */
+  /* 暗い背景でも検索対象外は背景に近づけ、線が密に重なっても構造を邪魔しない。
+     一致した線・ホバーの接続線は描画側で別の強調色を使う */
   --edge-3d:            #6b7078;
   --edge-3d-idle-alpha: 0.58;
   --edge-3d-dim-alpha:  0.20;
@@ -189,6 +188,44 @@ button {
 }
 
 .stage__host canvas { display: block; }
+
+.stage__labels {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 28px);
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--fg-mute);
+  font-size: 12px;
+  cursor: pointer;
+}
+.stage__labels input { margin: 0; accent-color: var(--hot); }
+
+.graph-label-anchor {
+  width: max-content;
+  opacity: 0;
+  pointer-events: none;
+}
+.graph-label {
+  display: block;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--fg);
+  font: 500 13px/18px var(--sans);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+.graph-label.is-hover { border-color: var(--hot); }
+.graph-label.is-neighbor { border-color: var(--fg-mute); }
 
 .results {
   min-height: 0;
@@ -941,9 +978,14 @@ code {
 .stage__hint {
   position: absolute;
   left: 14px;
-  top: 12px;
+  bottom: 12px;
+  max-width: calc(100% - 28px);
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  background: var(--bg-stage);
   font-size: 12px;
-  color: var(--fg-faint);
+  line-height: 1.65;
+  color: var(--fg-mute);
   pointer-events: none;
 }
 

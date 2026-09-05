@@ -31,7 +31,7 @@ const state = {
             paths: 0, ms: 0, running: false, error: null },
   cands: { rev: -1, rows: [], running: false, error: null },
   hoverEid: null,
-  view: { mode: '2d', cam2: null, cam3: null },
+  view: { mode: '2d', cam2: null, cam3: null, showAllLabels: false },
 };
 
 let anim = null;
@@ -246,6 +246,10 @@ function pinNode(node) {
 // ── ビュー ──────────────────────────────────────────────────────────────────
 
 function wireView(v) {
+  v.setShowAllLabels(state.view.showAllLabels);
+  const hint = $('graph-nav-hint');
+  hint.dataset.i18n = `graph.hint.${v.kind}`;
+  hint.textContent = t(hint.dataset.i18n);
   v.on('needsframe', kick);
   v.on('nodehover', (node) => {
     state.hoverEid = node ? node.eid : null;
@@ -374,6 +378,10 @@ async function disconnect() {
 // ── 画面まわりの結線 ────────────────────────────────────────────────────────
 
 function wireTopbar() {
+  $('show-all-labels').addEventListener('change', (ev) => {
+    state.view.showAllLabels = ev.target.checked;
+    if (view) { view.setShowAllLabels(state.view.showAllLabels); kick(); }
+  });
   for (const btn of document.querySelectorAll('[data-view]')) {
     btn.addEventListener('click', () => setViewMode(btn.dataset.view));
   }

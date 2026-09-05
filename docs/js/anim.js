@@ -5,12 +5,14 @@
  * どちらもこのバッファを読むだけの消費者になる。だから両者が食い違いようがなく、
  * モード切替の最中のフェードもそのまま継続する（cur を作り直さないので）。
  *
- * ノードは独立した4つの 0..1 を持つ:
+ * ノードは独立した5つの 0..1 を持つ:
  *   lit   0 = 減衰している / 1 = 生きている
  *   hot   1 = ラダーに一致した
  *   hover ポインタが乗っている
+ *   neighbor ホバー中のノードに直接つながっている（検索中は一致した入出辺のみ）
  *   pin   ピン留めされている
- * 辺は lit と hot の2つ。
+ * 辺は lit / hot と、ホバー中のノードにつながる hover の3つ。
+ * 接続の強調は検索結果の lit / hot を変えず、別のチャンネルで重ねる。
  *
  * hover と pin のアクセントは減衰中でも生き残らせる。薄くなったノードを
  * 指しても反応が返らないと、ピン留めできることに気付けない。
@@ -20,13 +22,13 @@
 const TAU = 0.30;            // 0.3 秒で 99.9% 到達
 const SETTLED = 0.0015;      // これ以下の差になったら止める
 
-const NODE_CHANNELS = ['lit', 'hot', 'hover', 'pin'];
-const EDGE_CHANNELS = ['lit', 'hot'];
+const NODE_CHANNELS = ['lit', 'hot', 'hover', 'neighbor', 'pin'];
+const EDGE_CHANNELS = ['lit', 'hot', 'hover'];
 
 /**
  * 状態 → 各チャンネルの目標値（0/1）。純関数。
  *
- * @param graph      {nodes: [{eid}], edges: [{eid}]}
+ * @param graph      {nodes: [{eid}], edges: [{eid, fromIdx, toIdx}]}
  * @param result     {litNodes: Set<eid>, litEdges: Set<eid>, paths} か null
  * @param hoverEid   ホバー中のノードの elementId か null
  * @param pinnedEids ピン留めされているノードの elementId の Set
@@ -36,13 +38,14 @@ export function computeVisual(graph, result, hoverEid, pinnedEids) {
   const m = graph.edges.length;
   const out = {
     nodeLit: new Uint8Array(n), nodeHot: new Uint8Array(n),
-    nodeHover: new Uint8Array(n), nodePin: new Uint8Array(n),
-    edgeLit: new Uint8Array(m), edgeHot: new Uint8Array(m),
+    nodeHover: new Uint8Array(n), nodeNeighbor: new Uint8Array(n), nodePin: new Uint8Array(n),
+    edgeLit: new Uint8Array(m), edgeHot: new Uint8Array(m), edgeHover: new Uint8Array(m),
   };
 
   const hasLadder = !!(result && result.cypher);
   const litNodes = result && result.litNodes;
   const litEdges = result && result.litEdges;
+  const hoverIdx = hoverEid == null ? -1 : graph.nodes.findIndex((node) => node.eid === hoverEid);
 
   for (let i = 0; i < n; i++) {
     const eid = graph.nodes[i].eid;
@@ -54,17 +57,23 @@ export function computeVisual(graph, result, hoverEid, pinnedEids) {
       out.nodeHot[i] = 1;
     }
     // 結果 0 件なら全部減衰する。「全部光る」にしないこと（絞り込みの逆に見える）
-    if (hoverEid && eid === hoverEid) out.nodeHover[i] = 1;
+    if (i === hoverIdx) out.nodeHover[i] = 1;
     if (pinnedEids && pinnedEids.has(eid)) out.nodePin[i] = 1;
   }
 
   for (let e = 0; e < m; e++) {
-    const eid = graph.edges[e].eid;
+    const { eid, fromIdx, toIdx } = graph.edges[e];
     if (!hasLadder) {
       out.edgeLit[e] = 1;
     } else if (litEdges && litEdges.has(eid)) {
       out.edgeLit[e] = 1;
       out.edgeHot[e] = 1;
+    }
+    const canTrace = !hasLadder || (litEdges && litEdges.has(eid));
+    if (canTrace && hoverIdx >= 0 && (fromIdx === hoverIdx || toIdx === hoverIdx)) {
+      out.edgeHover[e] = 1;
+      if (fromIdx !== hoverIdx && fromIdx >= 0 && fromIdx < n) out.nodeNeighbor[fromIdx] = 1;
+      if (toIdx !== hoverIdx && toIdx >= 0 && toIdx < n) out.nodeNeighbor[toIdx] = 1;
     }
   }
 
@@ -75,8 +84,8 @@ export function computeVisual(graph, result, hoverEid, pinnedEids) {
 export function createAnim(nNodes, nEdges) {
   const make = () => ({
     nodeLit: new Float32Array(nNodes), nodeHot: new Float32Array(nNodes),
-    nodeHover: new Float32Array(nNodes), nodePin: new Float32Array(nNodes),
-    edgeLit: new Float32Array(nEdges), edgeHot: new Float32Array(nEdges),
+    nodeHover: new Float32Array(nNodes), nodeNeighbor: new Float32Array(nNodes), nodePin: new Float32Array(nNodes),
+    edgeLit: new Float32Array(nEdges), edgeHot: new Float32Array(nEdges), edgeHover: new Float32Array(nEdges),
   });
   const cur = make();
   const target = make();

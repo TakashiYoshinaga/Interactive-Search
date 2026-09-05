@@ -14,8 +14,6 @@ const ZOOM_MAX = 12;
 const ZOOM_STEP = 1.0015;      // ホイール1ノッチあたり
 const DRAG_SLOP = 4;           // これ以上動いたらクリックではなくパン
 const CAM_TWEEN_SEC = 0.45;
-const ALWAYS_LABEL_MAX = 16;   // 件数がこれ以下のラベルは常にラベルを出す
-const ZOOM_LABEL_AT = 1.6;     // それ以外は fit の何倍まで寄ったら出すか
 const LABEL_H = 15;           // ラベル1行の高さ（衝突判定用）
 const LABEL_FONT = '11px system-ui, -apple-system, "Segoe UI", "Noto Sans JP", sans-serif';
 
@@ -26,11 +24,11 @@ export function createView(container, { theme }) {
   const ctx = canvas.getContext('2d');
 
   let currentTheme = theme;
+  let showAllLabels = false;
   let graph = null;
   let pos = null;              // Float32Array(n*2)
   let styles = [];             // ノードごとの theme スタイル
   let labelW = [];             // ラベル幅のキャッシュ（毎フレーム measureText しない）
-  let alwaysLabel = [];        // 常時ラベルを出すか
 
   let W = 1, H = 1, dpr = 1;
   const cam = { cx: 0, cy: 0, k: 1 };
@@ -55,12 +53,13 @@ export function createView(container, { theme }) {
   // ── 大きさ ────────────────────────────────────────────────────────────────
   function drawRadius(i, cur) {
     const s = styles[i];
-    const lit = cur.nodeLit[i];
+    const lit = Math.max(cur.nodeLit[i], cur.nodeHover[i], cur.nodeNeighbor[i], cur.nodePin[i]);
     const hot = cur.nodeHot[i];
     const accent = Math.max(cur.nodeHover[i], cur.nodePin[i]);
     const accentScale = Math.max(
       1 + (currentTheme.hoverScale - 1) * cur.nodeHover[i],
-      1 + (currentTheme.pinScale - 1) * cur.nodePin[i]
+      1 + (currentTheme.pinScale - 1) * cur.nodePin[i],
+      1 + 0.12 * cur.nodeNeighbor[i]
     );
     const dimScale = currentTheme.vars.dimScale;
     return s.radius * zoomScale()
@@ -153,9 +152,10 @@ export function createView(container, { theme }) {
       ctx.stroke();
     }
 
-    // 2) 一致した辺。金で太く、向きが分かるように矢を付ける
+    // 2) 検索結果は金、ホバーの接続線は文字色。向きが分かるように矢を付ける
     for (let e = 0; e < graph.edges.length; e++) {
-      const hot = cur.edgeHot[e];
+      const hover = cur.edgeHover[e];
+      const hot = Math.max(cur.edgeHot[e], hover);
       if (hot <= 0.02) continue;
       const edge = graph.edges[e];
       const a = edge.fromIdx, b = edge.toIdx;
@@ -163,21 +163,24 @@ export function createView(container, { theme }) {
       const x1 = toScreenX(pos[a * 2]), y1 = toScreenY(pos[a * 2 + 1]);
       const x2 = toScreenX(pos[b * 2]), y2 = toScreenY(pos[b * 2 + 1]);
       ctx.globalAlpha = hot;
-      ctx.strokeStyle = v.hot;
+      const color = hover > 0.25 ? v.fg : v.hot;
+      ctx.strokeStyle = color;
       ctx.lineWidth = 1 + 1.6 * hot;
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
-      drawArrow(x1, y1, x2, y2, drawRadius(b, cur) + 2, 5.5 * hot, v.hot, hot);
+      drawArrow(x1, y1, x2, y2, drawRadius(b, cur) + 2, 5.5 * hot, color, hot);
     }
 
     // 3) ノード。減衰しているものを先に描いて、強調が上に来るようにする
     const order = Array.from({ length: n }, (_, i) => i)
-      .sort((p, q) => (cur.nodeLit[p] + cur.nodeHot[p]) - (cur.nodeLit[q] + cur.nodeHot[q]));
+      .sort((p, q) =>
+        (cur.nodeLit[p] + cur.nodeHot[p] + cur.nodeNeighbor[p] * 2 + cur.nodeHover[p] * 3)
+        - (cur.nodeLit[q] + cur.nodeHot[q] + cur.nodeNeighbor[q] * 2 + cur.nodeHover[q] * 3));
 
     for (const i of order) {
-      const lit = cur.nodeLit[i];
+      const lit = Math.max(cur.nodeLit[i], cur.nodeNeighbor[i]);
       const accent = Math.max(cur.nodeHover[i], cur.nodePin[i]);
       const alpha = Math.max(v.dimAlpha + (1 - v.dimAlpha) * lit, accent);
       if (alpha <= 0.02) continue;
@@ -197,25 +200,24 @@ export function createView(container, { theme }) {
       }
     }
 
-    // 4) ラベル。全部出すと文字の雲になるので、強調・ホバー・ピンと、
-    //    件数の少ないラベルだけ。残りは寄ったときに出す。
+    // 4) 通常はホバー・接続先・ピンの名前だけ。「すべて表示」は明示的に選ぶ。
     //    レイアウト時の重なり解消だけでは足りない（ズームで文字の相対サイズが変わる）ので、
     //    画面空間でも置き場所をずらして衝突を避ける。
     ctx.font = LABEL_FONT;
     ctx.textBaseline = 'middle';
-    const zoomedIn = cam.k > kFit * ZOOM_LABEL_AT;
 
     const wanted = [];
     for (let i = 0; i < n; i++) {
-      const focus = Math.max(cur.nodeHot[i], cur.nodeHover[i], cur.nodePin[i]);
-      const ambient = (alwaysLabel[i] || zoomedIn) ? cur.nodeLit[i] * 0.75 : 0;
+      const focus = Math.max(cur.nodeHover[i], cur.nodeNeighbor[i], cur.nodePin[i]);
+      const ambient = showAllLabels ? 0.45 + 0.55 * cur.nodeLit[i] : 0;
       const a = Math.max(focus, ambient);
       if (a <= 0.05) continue;
       const x = toScreenX(pos[i * 2]), y = toScreenY(pos[i * 2 + 1]);
       const w = labelW[i] || 0;
       if (x + w < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
-      // ホバーとピンが最優先。次に一致したノード、最後に常時表示
-      const prio = cur.nodeHover[i] * 3 + cur.nodePin[i] * 2 + cur.nodeHot[i];
+      // ホバー → 接続先 → ピン → 検索結果 → 常時表示。
+      const prio = cur.nodeHover[i] > 0.25 ? 4 : cur.nodeNeighbor[i] > 0.25 ? 3
+        : cur.nodePin[i] > 0.25 ? 2 : cur.nodeHot[i] > 0.25 ? 1 : 0;
       wanted.push({ i, a, x, y, w, prio, focus, r: drawRadius(i, cur) });
     }
     wanted.sort((p, q) => q.prio - p.prio);
@@ -239,9 +241,9 @@ export function createView(container, { theme }) {
         const box = { x0: tx - 2, y0: ty - half, x1: tx + item.w + 2, y1: ty + half };
         if (!hits(box)) { spot = [tx, ty]; placed.push(box); break; }
       }
-      // ホバーとピンは押しのけてでも出す。それ以外は諦める（文字の雲を作らない）
+      // ホバー対象だけは必ず出す。他の名前は上位の名前に重ねない。
       if (!spot) {
-        if (item.prio < 2) continue;
+        if (item.prio < 4) continue;
         spot = spots[0];
         placed.push({ x0: spot[0] - 2, y0: spot[1] - half, x1: spot[0] + item.w + 2, y1: spot[1] + half });
       }
@@ -399,11 +401,12 @@ export function createView(container, { theme }) {
       styles = g.nodes.map((node) => currentTheme.forLabel(node.label));
       ctx.font = LABEL_FONT;
       labelW = g.nodes.map((node) => ctx.measureText(node.name).width);
-      alwaysLabel = g.nodes.map((node) => (g.labelTotals[node.label] || 0) <= ALWAYS_LABEL_MAX);
       resize();
       const fit = computeFit();
       if (fit) Object.assign(cam, fit);
     },
+
+    setShowAllLabels(show) { showAllLabels = !!show; },
 
     setTheme(next) {
       currentTheme = next;

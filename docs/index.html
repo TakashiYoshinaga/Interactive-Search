@@ -122,6 +122,7 @@
 
       <div class="prose" data-rich="prereq.note.both"></div>
       <div class="prose" data-rich="prereq.note.skip"></div>
+      <div class="prose" data-rich="prereq.note.running"></div>
       <div class="notice notice--warn prose" data-rich="prereq.warn"></div>
 
       <ul class="links">
@@ -299,7 +300,14 @@
 
     <section class="stage" id="stage">
       <div class="stage__host" id="graph-host"></div>
-      <div class="stage__hint" id="graph-hint"></div>
+      <label class="stage__labels" data-i18n-title="graph.labels.hint">
+        <input type="checkbox" id="show-all-labels">
+        <span data-i18n="graph.labels.all"></span>
+      </label>
+      <div class="stage__hint" id="graph-hint">
+        <div id="graph-nav-hint" data-i18n="graph.hint.2d"></div>
+        <div data-i18n="graph.hint.select"></div>
+      </div>
       <div class="stage__legend" id="graph-legend"></div>
     </section>
 

@@ -34,6 +34,11 @@ const DICT = {
     'app.disconnect': '切断',
     'app.copy': 'コピー',
     'app.status': '{nodes} ノード · {labels} ラベル',
+    'graph.hint.2d': 'ドラッグで移動 · ホイールでズーム',
+    'graph.hint.3d': 'ドラッグで回転 · ホイールでズーム',
+    'graph.hint.select': 'ノードをクリックして絞り込み · 結果欄の名前をクリックしてフォーカス',
+    'graph.labels.all': '名前をすべて表示',
+    'graph.labels.hint': '通常はホバー中・接続先・ピン留めの名前を表示します。オンにすると他の名前も表示します。',
 
     // ── 共通の操作 ────────────────────────────────────────────────────
     'common.back': '戻る',
@@ -75,6 +80,8 @@ const DICT = {
     'prereq.note.both':
       'セクション 3 には **接続セルと投入セルの両方** が入っています。接続セルだけ実行して満足しないでください。',
     'prereq.note.skip': 'セクション 1 と 2 は必要ありません。',
+    'prereq.note.running':
+      'Aura に**データ投入済み**の方は、接続の前に `https://console.neo4j.io` でインスタンスが **Running** になっていることを確認してください。無料の Aura インスタンスは 3 日使わないと自動で一時停止します。Paused のときは Resume を押し、**60 秒ほど待ってから**つないでください。',
     'prereq.warn':
       '投入セルは `MATCH (n) DETACH DELETE n` から始まります。**そのインスタンスの中身は全部消えます。** ワークショップ用の使い捨てインスタンスにだけ向けてください。',
     'prereq.notebook': 'ノートブックを開く',
@@ -210,6 +217,11 @@ const DICT = {
     'app.disconnect': 'Disconnect',
     'app.copy': 'Copy',
     'app.status': '{nodes} nodes · {labels} labels',
+    'graph.hint.2d': 'Drag to pan · Scroll to zoom',
+    'graph.hint.3d': 'Drag to rotate · Scroll to zoom',
+    'graph.hint.select': 'Click a node to filter · Click a name in Results to focus',
+    'graph.labels.all': 'Show all names',
+    'graph.labels.hint': 'Normally shows names for hovered, connected and pinned nodes. Turn on to show other names too.',
 
     'common.back': 'Back',
     'common.retry': 'Try again',
@@ -248,6 +260,8 @@ const DICT = {
     'prereq.note.both':
       'Section 3 contains **both the connect cell and the load cell.** Running only the connect cell is not enough.',
     'prereq.note.skip': 'Sections 1 and 2 are not required.',
+    'prereq.note.running':
+      'If you have **already loaded data**, check at `https://console.neo4j.io` that your instance is **Running** before connecting. Free Aura instances pause automatically after 3 days of no use. If it is paused, press Resume and **wait about 60 seconds** before trying again.',
     'prereq.warn':
       'The load cell begins with `MATCH (n) DETACH DELETE n`. **It erases everything in that instance.** Point it only at a throwaway workshop instance.',
     'prereq.notebook': 'Open the notebook',
